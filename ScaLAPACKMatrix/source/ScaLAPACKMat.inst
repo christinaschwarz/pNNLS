@@ -1,0 +1,27 @@
+template class ScaLAPACKMat< double >;
+
+template void ScaLAPACKMat< double >::scale_columns<dealii::Vector< double >>(const dealii::Vector< double > &);
+
+template void ScaLAPACKMat< double >::scale_rows<dealii::Vector< double >>(const dealii::Vector< double > &);
+ 
+template class ScaLAPACKMat< float >;
+
+template void ScaLAPACKMat< float >::scale_columns<dealii::Vector< float >>(const dealii::Vector< float > &);
+
+template void ScaLAPACKMat< float >::scale_rows<dealii::Vector< float >>(const dealii::Vector< float > &);
+ 
+template void ScaLAPACKMat< double >::scale_columns< std::vector < double >>(const  std::vector < double > &);
+
+template void ScaLAPACKMat< double >::scale_rows< std::vector < double >>(const  std::vector < double > &);
+ 
+template void ScaLAPACKMat< float >::scale_columns< std::vector < float >>(const  std::vector < float > &);
+
+template void ScaLAPACKMat< float >::scale_rows< std::vector < float >>(const  std::vector < float > &);
+ 
+template void ScaLAPACKMat< double >::scale_columns< dealii::ArrayView < double >>(const dealii::ArrayView < double > &);
+
+template void ScaLAPACKMat< double >::scale_rows< dealii::ArrayView < double >>(const dealii::ArrayView < double > &);
+ 
+template void ScaLAPACKMat< float >::scale_columns< dealii::ArrayView < float >>(const dealii::ArrayView < float > &);
+
+template void ScaLAPACKMat< float >::scale_rows< dealii::ArrayView < float >>(const dealii::ArrayView < float > &);

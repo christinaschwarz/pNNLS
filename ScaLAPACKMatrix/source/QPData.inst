@@ -1,0 +1,47 @@
+#include <boost/preprocessor/list/for_each.hpp>
+#include <boost/preprocessor/list/for_each_product.hpp>
+#include <boost/preprocessor/tuple/elem.hpp>
+#include <boost/preprocessor/tuple/to_list.hpp>
+
+
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/mpi/packed_iarchive.hpp>
+#include <boost/mpi/packed_oarchive.hpp>
+
+// List of feasible dimensions 
+#define Dimensions \
+BOOST_PP_TUPLE_TO_LIST( 2, (2, 3) )
+
+// List of Archive types
+#define Archives \
+BOOST_PP_TUPLE_TO_LIST( 6, (boost::archive::text_iarchive, \
+							boost::archive::binary_iarchive, \
+							boost::archive::text_oarchive, \
+							boost::archive::binary_oarchive, \
+							boost::mpi::packed_iarchive, \
+							boost::mpi::packed_oarchive ) )
+
+	
+# define Class_instantiation_I(R, _, T) \
+template class FE::QPData<T>;
+
+BOOST_PP_LIST_FOR_EACH(Class_instantiation_I, _, Dimensions)
+
+
+
+# define instantiation_serialize_I(R, _, T) \
+template void FE::MaterialData::serialize(T &, const unsigned int);
+
+BOOST_PP_LIST_FOR_EACH(instantiation_serialize_I, _, Archives)			
+
+
+
+#undef Dimensions
+#undef Archives
+#undef Archives_input
+#undef Archives_output
+#undef Class_instantiation_I
+#undef Instantiate_serialize					

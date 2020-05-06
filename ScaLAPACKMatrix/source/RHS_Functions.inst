@@ -1,0 +1,26 @@
+#include <boost/preprocessor/list/for_each.hpp>
+#include <boost/preprocessor/list/for_each_product.hpp>
+#include <boost/preprocessor/tuple/elem.hpp>
+#include <boost/preprocessor/tuple/to_list.hpp>
+
+
+// List of feasible dimensions 
+#define Dimensions \
+BOOST_PP_TUPLE_TO_LIST( 2, (2, 3) )
+
+
+# define Class_instantiation_2(R, _, T) \
+template class FE::Load<T>;
+
+BOOST_PP_LIST_FOR_EACH(Class_instantiation_2, _, Dimensions)
+
+
+# define Class_instantiation_1(R, _, T) \
+template class FE::ParabolicLoad<T>;
+
+BOOST_PP_LIST_FOR_EACH(Class_instantiation_1, _, Dimensions)
+
+
+#undef Dimensions
+#undef Class_instantiation_2
+#undef Class_instantiation_1

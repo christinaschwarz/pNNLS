@@ -1,0 +1,6 @@
+/bin/
+/build/
+/Data/
+.cproject
+.project
+.settings/

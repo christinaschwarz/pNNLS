@@ -1,0 +1,19 @@
+#include <boost/preprocessor/list/for_each.hpp>
+#include <boost/preprocessor/list/for_each_product.hpp>
+#include <boost/preprocessor/tuple/elem.hpp>
+#include <boost/preprocessor/tuple/to_list.hpp>
+
+
+// List of feasible dimensions 
+#define Dimensions \
+BOOST_PP_TUPLE_TO_LIST( 2, (2, 3) )
+
+
+# define Class_instantiation(R, _, T) \
+template class FE::SolidSerial<T>;
+
+BOOST_PP_LIST_FOR_EACH(Class_instantiation, _, Dimensions)
+
+
+#undef Dimensions
+#undef Class_instantiation

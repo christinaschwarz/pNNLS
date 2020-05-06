@@ -1,0 +1,105 @@
+#include <boost/preprocessor/list/for_each.hpp>
+#include <boost/preprocessor/list/for_each_product.hpp>
+#include <boost/preprocessor/tuple/elem.hpp>
+#include <boost/preprocessor/tuple/to_list.hpp>
+
+
+
+// List of DataTypes supported for HDF5
+#define HDF5_Types BOOST_PP_TUPLE_TO_LIST( 4, (int, unsigned int, float, double))
+#define HDF5_Types_floating_point BOOST_PP_TUPLE_TO_LIST( 2, (float, double))
+
+
+
+//Macros for explicit instantiation of HDF5 write functions
+
+#define Inst_write_matrix_HDF5(r,data,elem) \
+template void ReadWrite::write_matrix_HDF5<elem>(const std::string &, \
+												 const std::vector<elem> &, \
+												 const std::pair<unsigned int,unsigned int> &, \
+												 const std::pair<unsigned int,unsigned int> &);
+												 
+#define Inst_write_matrix_HDF5_2(r,data,elem) \
+template void ReadWrite::write_matrix_HDF5<elem>(const std::string &, \
+												 const dealii::FullMatrix<elem> &, \
+												 const std::pair<unsigned int,unsigned int> &);
+												 
+#define Inst_write_matrix_HDF5_3(r,data,elem) \
+template void ReadWrite::write_matrix_HDF5<elem>(const std::string &, \
+												 const dealii::LAPACKFullMatrix<elem> &, \
+												 const std::pair<unsigned int,unsigned int> &);
+
+#define Inst_write_vector_HDF5(r,data,elem) \
+template void ReadWrite::write_vector_HDF5<elem>(const std::string &, \
+												 const std::vector<elem> &, \
+												 const unsigned int, \
+												 const bool);
+
+
+
+//Macros for explicit instantiation of HDF5 read functions
+
+#define Inst_read_matrix_HDF5_1(r,data,elem) \
+template void ReadWrite::read_matrix_HDF5<elem>(const std::string &,std::vector<elem> &, \
+												std::pair<unsigned int,unsigned int> &);
+
+#define Inst_read_matrix_HDF5_2(r,data,elem) \
+template void ReadWrite::read_matrix_HDF5<elem>(const std::string &, \
+												std::vector<elem> &, \
+												const std::pair<unsigned int,unsigned int> &, \
+												const std::pair<unsigned int,unsigned int> &);
+												
+#define Inst_read_matrix_HDF5_3(r,data,elem) \
+template void ReadWrite::read_matrix_HDF5<elem>(const std::string &, \
+												dealii::FullMatrix<elem> &);
+												
+#define Inst_read_matrix_HDF5_4(r,data,elem) \
+template void ReadWrite::read_matrix_HDF5<elem>(const std::string &, \
+												dealii::LAPACKFullMatrix<elem> &);
+
+#define Inst_read_matrix_HDF5_5(r,data,elem) \
+template void ReadWrite::read_matrix_HDF5<elem>(const std::string &, \
+												dealii::FullMatrix<elem> &, \
+												const std::pair<unsigned int,unsigned int> &);
+		
+#define Inst_read_matrix_HDF5_6(r,data,elem) \
+template void ReadWrite::read_matrix_HDF5<elem>(const std::string &, \
+												dealii::LAPACKFullMatrix<elem> &, \
+												const std::pair<unsigned int,unsigned int> &);
+
+#define Inst_read_vector_HDF5(r,data,elem) \
+template void ReadWrite::read_vector_HDF5<elem>(const std::string &, \
+												std::vector<elem> &, \
+												const unsigned int, \
+												const unsigned int);
+																							 
+																							 
+
+BOOST_PP_LIST_FOR_EACH(Inst_write_matrix_HDF5, none, HDF5_Types)
+BOOST_PP_LIST_FOR_EACH(Inst_write_matrix_HDF5_2, none, HDF5_Types)
+BOOST_PP_LIST_FOR_EACH(Inst_write_matrix_HDF5_3, none, HDF5_Types_floating_point)
+BOOST_PP_LIST_FOR_EACH(Inst_write_vector_HDF5, none, HDF5_Types)
+
+BOOST_PP_LIST_FOR_EACH(Inst_read_matrix_HDF5_1, none, HDF5_Types)
+BOOST_PP_LIST_FOR_EACH(Inst_read_matrix_HDF5_2, none, HDF5_Types)
+BOOST_PP_LIST_FOR_EACH(Inst_read_matrix_HDF5_3, none, HDF5_Types)
+BOOST_PP_LIST_FOR_EACH(Inst_read_matrix_HDF5_4, none, HDF5_Types_floating_point)
+BOOST_PP_LIST_FOR_EACH(Inst_read_matrix_HDF5_5, none, HDF5_Types_floating_point)
+BOOST_PP_LIST_FOR_EACH(Inst_read_matrix_HDF5_6, none, HDF5_Types_floating_point)
+BOOST_PP_LIST_FOR_EACH(Inst_read_vector_HDF5, none, HDF5_Types)
+
+
+
+#undef HDF5_Types
+#undef HDF5_Types_floating_point
+#undef Inst_write_matrix_HDF5
+#undef Inst_write_matrix_HDF5_2
+#undef Inst_write_matrix_HDF5_3
+#undef Inst_write_vector_HDF5
+#undef Inst_read_matrix_HDF5_1
+#undef Inst_read_matrix_HDF5_2
+#undef Inst_read_matrix_HDF5_3
+#undef Inst_read_matrix_HDF5_4
+#undef Inst_read_matrix_HDF5_5
+#undef Inst_read_matrix_HDF5_6
+#undef Inst_read_vector_HDF5
