@@ -114,7 +114,7 @@ namespace
                             &inactive_with_root_group);
       AssertThrowMPI(ierr);
 
-      const int mpi_tag = Tags::process_grid_constructor;
+      const int mpi_tag =1345 /*Tags::process_grid_constructor*/;
 
       ierr = dealii::Utilities::MPI::create_group(mpi_communicator,
                                           	  	  inactive_with_root_group,

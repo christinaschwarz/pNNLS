@@ -681,6 +681,100 @@ extern "C"
            int *        iwork,
            int *        liwork,
            int *        info);
+
+
+
+  //-----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+  void pdormqr(const char *  side,
+			const char *  trans,
+			const int *   m,
+			const int *   n,
+			const int *   k,
+			double *A,
+			const int *   IA,
+			const int *   JA,
+			const int *   DESCA,
+			const double * tau,
+			double *      C,
+			const int *   IC,
+			const int *   JC,
+			const int *   DESCC,
+			double *      work,
+			int *         lwork,
+			int *         info  );
+
+  void psormqr(const char *  side,
+  			const char *  trans,
+  			const int *   m,
+  			const int *   n,
+  			const int *   k,
+  			 float *A,
+  			const int *   IA,
+  			const int *   JA,
+  			const int *   DESCA,
+  			const float * tau,
+			float *      C,
+  			const int *   IC,
+  			const int *   JC,
+  			const int *   DESCC,
+			float *      work,
+  			int *         lwork,
+  			int *         info  );
+
+
+  void pdtrsv_(const char * uplo,
+			const char * trans,
+			const char * diag,
+			const int * n,
+			const double * A,
+			const int * IA,
+			const int * JA,
+			const int * DESCA,
+			double * X,
+			const int * IX,
+			const int * JX,
+			const int * DESCX,
+			const int * incx  );
+
+  void pstrsv_(const char * uplo,
+  			const char * trans,
+  			const char * diag,
+  			const int * n,
+  			const float * A,
+  			const int * IA,
+  			const int * JA,
+  			const int * DESCA,
+			float * X,
+  			const int * IX,
+  			const int * JX,
+  			const int * DESCX,
+  			const int * incx  );
+
+
+  void pdgeqrf(const int *   m,
+			const int *   n,
+			double *A,
+			const int *   IA,
+			const int *   JA,
+			const int *   DESCA,
+			double * tau,
+			double *      work,
+			int *         lwork,
+			int *         info );
+
+  void psgeqrf(const int *   m,
+  			const int *   n,
+  			float *A,
+  			const int *   IA,
+  			const int *   JA,
+  			const int *   DESCA,
+  			float * tau,
+			float *      work,
+  			int *         lwork,
+  			int *         info );
+
+  //------------------------------------------------------------------------------------------------------------------------------------------------------------
 }
 
 
@@ -2011,5 +2105,273 @@ psyevr(const char * jobz,
            liwork,
            info);
 }
+
+
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+//PDORMQR-------------------------------------------------
+template <typename number>
+inline void
+pormqr(const char *,
+      const char * ,
+      const int * ,
+      const int * ,
+      const int * ,
+      number * ,
+      const int * ,
+      const int * ,
+      const int * ,
+	  const number * ,
+      number * ,
+      const int * ,
+      const int * ,
+      const int * ,
+	  number * ,
+	   int * ,
+	  int *
+      )
+{
+  Assert(false, dealii::ExcNotImplemented());
+}
+
+inline void
+pormqr(const char *  side,
+      const char *  trans,
+      const int *   m,
+      const int *   n,
+      const int *   k,
+      double *A,
+      const int *   IA,
+      const int *   JA,
+      const int *   DESCA,
+	  const double * tau,
+      double *      C,
+      const int *   IC,
+      const int *   JC,
+      const int *   DESCC,
+	  double *      work,
+	   int *   lwork,
+	  int *         info
+	  )
+{
+  pdormqr(side,
+          trans,
+          m,
+          n,
+          k,
+          A,
+          IA,
+          JA,
+          DESCA,
+          tau,
+          C,
+          IC,
+          JC,
+          DESCC,
+		  work,
+		  lwork,
+		  info);
+}
+
+
+inline void
+pormqr(const char *  side,
+      const char *  trans,
+      const int *   m,
+      const int *   n,
+      const int *   k,
+      float *A,
+      const int *   IA,
+      const int *   JA,
+      const int *   DESCA,
+	  const float * tau,
+      float *      C,
+      const int *   IC,
+      const int *   JC,
+      const int *   DESCC,
+	  float *      work,
+	   int *   lwork,
+	  int *         info
+	  )
+{
+  psormqr(side,
+          trans,
+          m,
+          n,
+          k,
+          A,
+          IA,
+          JA,
+          DESCA,
+          tau,
+          C,
+          IC,
+          JC,
+          DESCC,
+		  work,
+		  lwork,
+		  info);
+}
+
+
+//PDTRSV_ -------------------------------------------------------------
+template <typename number>
+inline void
+ptrsv(const char * ,
+      const char * ,
+	  const char * ,
+      const int * ,
+      const number * ,
+      const int * ,
+      const int * ,
+      const int * ,
+      number * ,
+      const int * ,
+      const int * ,
+      const int * ,
+	  const int *
+      )
+{
+  Assert(false, dealii::ExcNotImplemented());
+}
+
+inline void
+ptrsv(const char * uplo,
+      const char * trans,
+	  const char * diag,
+      const int * n,
+      const double * A,
+      const int * IA,
+      const int * JA,
+      const int * DESCA,
+      double * X,
+      const int * IX,
+      const int * JX,
+      const int * DESCX,
+	  const int * incx
+      )
+{
+  pdtrsv_(uplo,
+          trans,
+		  diag,
+          n,
+          A,
+          IA,
+          JA,
+          DESCA,
+          X,
+          IX,
+          JX,
+          DESCX,
+		  incx);
+}
+
+
+inline void
+ptrsv(const char * uplo,
+      const char * trans,
+	  const char * diag,
+      const int * n,
+      const float * A,
+      const int * IA,
+      const int * JA,
+      const int * DESCA,
+      float * X,
+      const int * IX,
+      const int * JX,
+      const int * DESCX,
+	  const int * incx
+      )
+{
+  pstrsv_(uplo,
+          trans,
+		  diag,
+          n,
+          A,
+          IA,
+          JA,
+          DESCA,
+          X,
+          IX,
+          JX,
+          DESCX,
+		  incx);
+}
+
+
+
+//PDGEQRF ----------------------------------
+template <typename number>
+inline void
+pgeqrf(const int * ,
+      const int * ,
+      number * ,
+      const int * ,
+      const int * ,
+      const int * ,
+	  number * ,
+	  number * ,
+	  int * ,
+	  int *
+      )
+{
+  Assert(false, dealii::ExcNotImplemented());
+}
+
+inline void
+pgeqrf(const int *   m,
+      const int *   n,
+      double *A,
+      const int *   IA,
+      const int *   JA,
+      const int *   DESCA,
+	  double * tau,
+	  double *      work,
+	  int *         lwork,
+	  int *         info
+	  )
+{
+  pdgeqrf(m,
+          n,
+          A,
+          IA,
+          JA,
+          DESCA,
+          tau,
+		  work,
+		  lwork,
+		  info);
+}
+
+
+inline void
+pgeqrf(const int *   m,
+      const int *   n,
+      float *A,
+      const int *   IA,
+      const int *   JA,
+      const int *   DESCA,
+	  float * tau,
+	  float *      work,
+	  int *         lwork,
+	  int *         info
+	  )
+{
+  psgeqrf(m,
+          n,
+          A,
+          IA,
+          JA,
+          DESCA,
+          tau,
+		  work,
+		  lwork,
+		  info);
+}
+
+
+
+
 
 #endif // scalapack_templates_h

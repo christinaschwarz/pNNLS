@@ -12,6 +12,7 @@
 #include <deal.II/lac/lapack_support.h>
 
 #include <mpi.h>
+#include <vector>
 
 #include <memory>
 
@@ -228,6 +229,36 @@ public:
   void
   scale_rows(const InputVector &factors);
 
+
+
+
+
+  //-----------------------------------------------------------------------------------------------------------------------------------------------------
+
+ void parallel_NNLS
+  	(const std::shared_ptr<ScaLAPACKMat<NumberType>> &b, std::shared_ptr<ScaLAPACKMat<NumberType>> &x, const double epsilon, const int pmax);
+
+  void update_qr
+  	(std::shared_ptr<ScaLAPACKMat<NumberType>> &Asub, const int k, const std::vector<int> passive_set, std::vector<NumberType> &tau);
+
+
+  void update_g
+  	(const std::shared_ptr<ScaLAPACKMat<NumberType>> &b, std::shared_ptr<ScaLAPACKMat<NumberType>> &g, const int k, const int p, std::vector<NumberType> &tau);
+
+  std::pair<NumberType,std::array<int,2>> min_value
+  	(int col_begin, int col_end, int row_begin, int row_end);
+
+  std::pair<NumberType,std::array<int,2>> max_value
+  	(int col_begin, int col_end, int row_begin, int row_end);
+
+
+  //-----------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
 private:
 
   NumberType
@@ -269,6 +300,9 @@ private:
 
   void
   load_parallel(const std::string &filename);
+
+
+
 
   dealii::LAPACKSupport::State state;
 
@@ -363,6 +397,7 @@ ScaLAPACKMat<NumberType>::local_n() const
 {
   return n_local_columns;
 }
+
 
 
 

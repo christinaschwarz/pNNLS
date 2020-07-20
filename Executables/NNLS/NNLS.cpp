@@ -26,19 +26,14 @@ int main(int argc, char **argv)
 		std::cout << "Starting computation of serial NNLS problem." << std::endl << std::endl;
 
 		dealii::LAPACKFullMatrix<double> matrix_J;
-
 		ReadWrite::read_matrix_HDF5(args[0]+"/matrix_J.h5",matrix_J);
 
 		std::vector<double> tmp_vector_b, tmp_vector_ref_solution;
-
 		ReadWrite::read_vector_HDF5(args[0]+"/vector_b.h5",tmp_vector_b);
-
 		ReadWrite::read_vector_HDF5(args[0]+"/vector_x.h5",tmp_vector_ref_solution);
 
 		dealii::Vector<double> vector_b(tmp_vector_b.size()), ref_solution(tmp_vector_ref_solution.size());
-
 		std::copy(tmp_vector_b.begin(),tmp_vector_b.end(),vector_b.begin());
-
 		std::copy(tmp_vector_ref_solution.begin(),tmp_vector_ref_solution.end(),ref_solution.begin());
 
 		std::cout << "Dimensions of matrix A: " << matrix_J.m() << " x " << matrix_J.n() << std::endl;
@@ -46,24 +41,88 @@ int main(int argc, char **argv)
 
 		dealii::Vector<double> solution(matrix_J.n());
 
+		//Test problem
+		dealii::LAPACKFullMatrix<double> matrix_J_(5);
+
+		//TEST 1
+//		matrix_J_(0,0)=1.;
+//		matrix_J_(0,3)=1.;
+//		matrix_J_(0,4)=2.;
+//		matrix_J_(1,0)=3.;
+//		matrix_J_(1,2)=1.;
+//		matrix_J_(1,4)=1.;
+//		matrix_J_(2,0)=-1.;
+//		matrix_J_(2,2)=-1.;
+//		matrix_J_(2,3)=-2.;
+//		matrix_J_(3,1)=2.;
+//		matrix_J_(3,2)=1.;
+//		matrix_J_(4,1)=1.;
+//		matrix_J_(4,2)=-1.;
+//		matrix_J_(4,3)=1.;
+//		std::vector<double> tmp_vector_b_={5.,7.,-8.,7.,1.};
+
+		//TEST 2
+		matrix_J_(0,0)=1;
+		matrix_J_(0,1)=2;
+		matrix_J_(0,2)=3;
+		matrix_J_(0,3)=0;
+		matrix_J_(0,4)=1;
+
+		matrix_J_(1,0)=-1;
+		matrix_J_(1,1)=0;
+		matrix_J_(1,2)=1;
+		matrix_J_(1,3)=-1;
+		matrix_J_(1,4)=1;
+
+		matrix_J_(2,0)=1;
+		matrix_J_(2,1)=2;
+		matrix_J_(2,2)=-1;
+		matrix_J_(2,3)=1;
+		matrix_J_(2,4)=0;
+
+		matrix_J_(3,0)=2;
+		matrix_J_(3,1)=1;
+		matrix_J_(3,2)=2;
+		matrix_J_(3,3)=3;
+		matrix_J_(3,4)=-2;
+
+		matrix_J_(4,0)=-2;
+		matrix_J_(4,1)=-1;
+		matrix_J_(4,2)=0;
+		matrix_J_(4,3)=2;
+		matrix_J_(4,4)=-1;
+
+		std::vector<double> tmp_vector_b_={11.,1.,6.,6.,-3.};
+
+		dealii::Vector<double> vector_b_(tmp_vector_b_.size());
+		std::copy(tmp_vector_b_.begin(),tmp_vector_b_.end(),vector_b_.begin());
+		dealii::Vector<double> solution_(5);
+
+
+		//DO NNLS
 		std::cout << "Start solution ... " << std::flush;
-		const double res = Fortran::NNLS(matrix_J,solution,vector_b,1000);
-		std::cout << "done" << std::endl;
+		//const double res = Fortran::NNLS(matrix_J,solution,vector_b,1000);
+		const double res_ = Fortran::NNLS(matrix_J_,solution_,vector_b_,1000);
+		std::cout << "done, x=" << std::endl;
+		for(int i=0;i<5;i++){
+			std::cout << solution_(i) << std::endl;
+		}
+		std::cout << "Rückgabewert NNLS= "<< res_ << std::endl;
 
-		dealii::Vector<double> vector_residuum(vector_b);
 
-		matrix_J.vmult(vector_residuum,solution);
+//		//calculate Residual
+//		dealii::Vector<double> vector_residuum(vector_b);
+//		matrix_J.vmult(vector_residuum,solution);
+//		vector_residuum -= vector_b;
+//
+//		std::cout << "Residuum of NNLS solution: " << vector_residuum.l2_norm() << " / "
+//				  << vector_b.l2_norm() << " = " << vector_residuum.l2_norm() / vector_b.l2_norm() << std::endl;
+//
+//		ref_solution -= solution;
+//		std::cout << "Difference to reference solution: " << ref_solution.l2_norm() << std::endl;
+//		std::cout << std::endl << std::endl;
 
-		vector_residuum -= vector_b;
 
-		std::cout << "Residuum of NNLS solution: " << vector_residuum.l2_norm() << " / "
-				  << vector_b.l2_norm() << " = " << vector_residuum.l2_norm() / vector_b.l2_norm() << std::endl;
-
-		ref_solution -= solution;
-
-		std::cout << "Difference to reference solution: " << ref_solution.l2_norm() << std::endl;
-
-		std::cout << std::endl << std::endl;
 	}
 	catch (std::exception &exc)
     {

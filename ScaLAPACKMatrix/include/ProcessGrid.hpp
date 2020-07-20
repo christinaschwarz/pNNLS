@@ -28,6 +28,8 @@ class ScaLAPACKMat;
                   const unsigned int n_columns_matrix,
                   const unsigned int row_block_size,
                   const unsigned int column_block_size);
+      ProcessGrid(MPI_Comm           mpi_communicator,
+                        const std::pair<unsigned int, unsigned int> &grid_dimensions);	//diesen Konstruktor verwenden!!
 
       ~ProcessGrid();
 
@@ -52,8 +54,7 @@ class ScaLAPACKMat;
 
     private:
 
-      ProcessGrid(MPI_Comm                                     mpi_communicator,
-                  const std::pair<unsigned int, unsigned int> &grid_dimensions);
+
 
       MPI_Comm mpi_communicator;
 
