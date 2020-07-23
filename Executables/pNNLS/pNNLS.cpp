@@ -163,62 +163,62 @@ int main (int argc, char **argv)
 		std::shared_ptr<ScaLAPACKMat<double>> x_  =  std::make_shared<ScaLAPACKMat<double>>(5, 1, grid, 2, 1);
 
 		//TEST 1
-		J_.local_el(0,0)=1.;
-		J_.local_el(0,3)=1.;
-		J_.local_el(0,4)=2.;
-		J_.local_el(1,0)=3.;
-		J_.local_el(1,2)=1.;
-		J_.local_el(1,4)=1.;
-		J_.local_el(2,0)=-1.;
-		J_.local_el(2,2)=-1.;
-		J_.local_el(2,3)=-2.;
-		J_.local_el(3,1)=2.;
-		J_.local_el(3,2)=1.;
-		J_.local_el(4,1)=1.;
-		J_.local_el(4,2)=-1.;
-		J_.local_el(4,3)=1.;
-		b_->local_el(0,0)=5.;
-		b_->local_el(1,0)=7.;
-		b_->local_el(2,0)=-8.;
-		b_->local_el(3,0)=7.;
-		b_->local_el(4,0)=1.;
+//		J_.local_el(0,0)=1.;
+//		J_.local_el(0,3)=1.;
+//		J_.local_el(0,4)=2.;
+//		J_.local_el(1,0)=3.;
+//		J_.local_el(1,2)=1.;
+//		J_.local_el(1,4)=1.;
+//		J_.local_el(2,0)=-1.;
+//		J_.local_el(2,2)=-1.;
+//		J_.local_el(2,3)=-2.;
+//		J_.local_el(3,1)=2.;
+//		J_.local_el(3,2)=1.;
+//		J_.local_el(4,1)=1.;
+//		J_.local_el(4,2)=-1.;
+//		J_.local_el(4,3)=1.;
+//		b_->local_el(0,0)=5.;
+//		b_->local_el(1,0)=7.;
+//		b_->local_el(2,0)=-8.;
+//		b_->local_el(3,0)=7.;
+//		b_->local_el(4,0)=1.;
 
 		//TEST 2
-//		J_.local_el(0,0)=1.;
-//		J_.local_el(0,1)=2.;
-//		J_.local_el(0,2)=3.;
-//		J_.local_el(0,3)=0;
-//		J_.local_el(0,4)=1.;
-//
-//		J_.local_el(1,0)=-1.;
-//		J_.local_el(1,1)=0.;
-//		J_.local_el(1,2)=1.;
-//		J_.local_el(1,3)=-1.;
-//		J_.local_el(1,4)=1.;
-//
-//		J_.local_el(2,0)=1.;
-//		J_.local_el(2,1)=2.;
-//		J_.local_el(2,2)=-1.;
-//		J_.local_el(2,3)=1.;
-//		J_.local_el(2,4)=0.;
-//
-//		J_.local_el(3,0)=2.;
-//		J_.local_el(3,1)=1.;
-//		J_.local_el(3,2)=2.;
-//		J_.local_el(3,3)=3.;
-//		J_.local_el(3,4)=-2.;
-//
-//		J_.local_el(4,0)=-2.;
-//		J_.local_el(4,1)=-1.;
-//		J_.local_el(4,2)=0.;
-//		J_.local_el(4,3)=2.;
-//		J_.local_el(4,4)=-1.;
-//
-//		b_->local_el(0,0)=11.;
-//		b_->local_el(1,0)=1.;
-//		b_->local_el(2,0)=6.;
-//		b_->local_el(3,0)=6.;
-//		b_->local_el(4,0)=-3.;
+		J_.local_el(0,0)=1.;
+		J_.local_el(0,1)=2.;
+		J_.local_el(0,2)=3.;
+		J_.local_el(0,3)=0;
+		J_.local_el(0,4)=1.;
+
+		J_.local_el(1,0)=-1.;
+		J_.local_el(1,1)=0.;
+		J_.local_el(1,2)=1.;
+		J_.local_el(1,3)=-1.;
+		J_.local_el(1,4)=1.;
+
+		J_.local_el(2,0)=1.;
+		J_.local_el(2,1)=2.;
+		J_.local_el(2,2)=-1.;
+		J_.local_el(2,3)=1.;
+		J_.local_el(2,4)=0.;
+
+		J_.local_el(3,0)=2.;
+		J_.local_el(3,1)=1.;
+		J_.local_el(3,2)=2.;
+		J_.local_el(3,3)=3.;
+		J_.local_el(3,4)=-2.;
+
+		J_.local_el(4,0)=-2.;
+		J_.local_el(4,1)=-1.;
+		J_.local_el(4,2)=0.;
+		J_.local_el(4,3)=2.;
+		J_.local_el(4,4)=-1.;
+
+		b_->local_el(0,0)=11.;
+		b_->local_el(1,0)=1.;
+		b_->local_el(2,0)=6.;
+		b_->local_el(3,0)=6.;
+		b_->local_el(4,0)=-3.;
 
 
 //		for(int i=0;i<5;i++){
@@ -235,10 +235,10 @@ int main (int argc, char **argv)
 
 
 		//neue Funktion pNNLS aufrufen
-		double tau=0.1;
+		double tau=0.01;
 		int pmax= 100;		//Achtung, pmax sollte kleiner als m=2700 sein
-		//J.parallel_NNLS(b,x,tau,pmax);
-		J_.parallel_NNLS(b_,x_,tau,pmax);
+		J.parallel_NNLS(b,x,tau,pmax);
+		//J_.parallel_NNLS(b_,x_,tau,pmax);
 
 		//Teilschritte
 //		std::vector<int> passive_set={2};

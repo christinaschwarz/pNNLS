@@ -3519,7 +3519,7 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 	int iteration=0;
 	bool first_round=true;
 	//std::cout << "Initialization done" << std::endl;
-	std::cout << "b-frobenius=" << b->frobenius_norm() <<std::endl;
+	std::cout << "b-frobenius=" << b->frobenius_norm()*epsilon <<std::endl;
 
 
 //OUTER LOOP	------------------------------------------------------------------------------
@@ -3534,6 +3534,7 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 		for (int i=0;i<p;i++){
 			std::cout << passive_set.at(i) << ",";
 		}
+		std::cout << std::endl;
 
 
 		//r=[0 g(-p)]T, N=m
@@ -3553,9 +3554,11 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 		const char side ='L';
 		const char trans ='N';
 
-		std::cout <<std::endl << "vector g bzw r vor pormqr:" << std::endl;
-		for(int i=0;i<5;i++){
-			std::cout << r.local_el(i,0) << std::endl;
+		if(n==5){
+			std::cout <<std::endl << "vector g bzw r vor pormqr:" << std::endl;
+			for(int i=0;i<5;i++){
+				std::cout << r.local_el(i,0) << std::endl;
+			}
 		}
 
 		if (first_round==false){	//immer, außer in der allerersten Runde, wo Q=I gilt
@@ -3574,13 +3577,15 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 		//w=AT*r
 		ScaLAPACKMat<NumberType> w (n, 1, grid, blocksize, 1);
 		this->Tmmult(w,r,false);
-		std::cout << "vector r nach pormqr:" << std::endl;
-		for(int i=0;i<5;i++){
-			std::cout << r.local_el(i,0) << std::endl;
-		}
-		std::cout << "vector w:" << std::endl;
-		for(int i=0;i<5;i++){
-			std::cout << w.local_el(i,0) << std::endl;
+		if(n==5){
+			std::cout << "vector r nach pormqr:" << std::endl;
+			for(int i=0;i<5;i++){
+				std::cout << r.local_el(i,0) << std::endl;
+			}
+			std::cout << "vector w:" << std::endl;
+			for(int i=0;i<5;i++){
+				std::cout << w.local_el(i,0) << std::endl;
+			}
 		}
 
 		//finde größte Variable von w
@@ -3597,9 +3602,11 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 				//alle Variablen mit Index in P bleiben Null --> wenn w_max gesucht wird: soll eh größer als Null sein
 			}
 		}
-		std::cout << "vector w_active:" << std::endl;
-		for(int i=0;i<5;i++){
-			std::cout << w_active.local_el(i,0) << std::endl;
+		if(n==5){
+			std::cout << "vector w_active:" << std::endl;
+			for(int i=0;i<5;i++){
+				std::cout << w_active.local_el(i,0) << std::endl;
+			}
 		}
 
 		std::pair <double,std::array<int,2>> wmax=w_active.max_value(0,n-1,0,0);		//wmax[0]=wmax, wmax[1]=imax	//nur die Variablen prüfen, die nicht in passive_set sind
@@ -3656,8 +3663,10 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 			//R ist in oberer Hälfte von A gespeichert, andere Werte von A bleiben unberücksichtigt		//nur für die ersten p Spalten von Asub
 			ptrsv( &uplo, &trans, &diag, &p, A_loc, &one, &one, Asub->descriptor, yp_loc, &one, &one, y.descriptor, &incy);
 			std::cout << "SOLVING done" << std::endl;
-			for (int j=0;j<p;j++){
-				std::cout << yp.local_el(j,0) << std::endl;
+			if(n==5){
+				for (int j=0;j<p;j++){
+					std::cout << yp.local_el(j,0) << std::endl;
+				}
 			}
 
 			//Finde kleinste Variable in y
@@ -3683,35 +3692,37 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 						alpha_vec.push_back(  y.local_el(i,0) / (y.local_el(i,0)-yp.local_el(i,0))  );
 					}
 				}
-				for (unsigned int i=0;i<alpha_vec.size();i++){
-					std::cout << "alpha_vec.at(" << i << ")= "<< alpha_vec.at(i) << std::endl;
-				}
+//				for (unsigned int i=0;i<alpha_vec.size();i++){
+//					std::cout << "alpha_vec.at(" << i << ")= "<< alpha_vec.at(i) << std::endl;
+//				}
 
 				auto it = std::min_element(alpha_vec.begin(), alpha_vec.end());
 				int index = std::distance( alpha_vec.begin(), it );
 				double alpha=alpha_vec.at(index);
 				std::cout << "alpha=" << alpha << std::endl;
 
-				std::cout << "vector y (old solution): "<< std::endl;
-				for (int i=0;i<n;i++){
-					std::cout << y.local_el(i,0) << std::endl;
-				}
+//				std::cout << "vector y (old solution): "<< std::endl;
+//				for (int i=0;i<n;i++){
+//					std::cout << y.local_el(i,0) << std::endl;
+//				}
 
 				//update y als Interpolation zw vorheriger Lsg x und der neuen nicht machbaren y
 				y.add(yp, (1-alpha), alpha, false);		//y=y+alpha*(yp-y)=y+alpha*yp - alpha*y=  alpha*yp +(1-alpha)*y;
-
-
-
+				for(int i=0;i<m;i++){
+					if(y.local_el(i,0)<0.0000000001){
+						y.local_el(i,0)=0;
+					}
+				}
 
 				//alle fixed variables aus P entfernen, update set P
 				std::vector<int> p_0={};		//set erstellen mit den Indizes aller Variablen, die aus dem passive-set entfernt werden sollen
 				int anzahl_neg_variablen=0;
 				for (int i=0; i<p;i++){
 					if(y.local_el(i,0)<=0){		//eigentlich "nicht positive" variablen
-						std::cout << "to delete: i=" << i << ", y(i)= " << y.local_el(i,0) << std::endl;
+//						std::cout << "to delete: i=" << i << ", y(i)= " << y.local_el(i,0) << std::endl;
 						p_0.push_back(i);
 						anzahl_neg_variablen=p_0.size();		//bzw. anzahl_neg_variablen++;
-						std::cout << "anzahl_nicht_positive_variablen= " << anzahl_neg_variablen << std::endl;
+//						std::cout << "anzahl_nicht_positive_variablen= " << anzahl_neg_variablen << std::endl;
 					}
 				}
 
@@ -3719,12 +3730,10 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 				int qmin=p_0.at(0)+1;			//qmin=kleinster index in p_o, also einfach der erste aufgelistete; qmin um 1 erhöhen, da Indizes ab 0 beginnen, aber UPDATEQR Indizes ab 1 nimmt
 				std::cout << "qmin_index = " << qmin << std::endl;
 
-				y.local_el(qmin,0)=0;
-
-				std::cout << "vector y (after updating): "<< std::endl;
-				for (int i=0;i<n;i++){
-					std::cout << y.local_el(i,0) << std::endl;
-				}
+//				std::cout << "vector y (after updating): "<< std::endl;
+//				for (int i=0;i<n;i++){
+//					std::cout << y.local_el(i,0) << std::endl;
+//				}
 
 				std::vector<int> new_set={};
 				for (int i=0;i<p;i++){
@@ -3732,12 +3741,12 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 					for (int j=0;j<anzahl_neg_variablen;j++){
 						if(i==p_0.at(j)){
 							to_delete=true;
-							std::cout << "entered if to delete" << std::endl;
+							//std::cout << "entered if to delete" << std::endl;
 						}
 					}
 					if (! to_delete){
 						new_set.push_back(passive_set.at(i));
-						std::cout << "entered if to keep" << std::endl;
+						//std::cout << "entered if to keep" << std::endl;
 					}
 				}
 
@@ -3746,13 +3755,16 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 				std::cout << "p=" << p << std::endl;
 
 				//reorder values in y
-				for (int i=qmin-1;i<p;i++){
+				for (int i=qmin-1;i<p+1;i++){
 					y.local_el(i,0)=y.local_el(i+1,0);
 				}
-				std::cout << "vector y (after reordering): "<< std::endl;
-				for (int i=0;i<n;i++){
-					std::cout << y.local_el(i,0) << std::endl;
+				for (int i=p+1;i<n;i++){
+					y.local_el(i,0)=0;
 				}
+//				std::cout << "vector y (after reordering): "<< std::endl;
+//				for (int i=0;i<n;i++){
+//					std::cout << y.local_el(i,0) << std::endl;
+//				}
 
 				//UPDATE QR für alle Spalten rechts, der entfernten (DOWNDATING) -->k=qmin
 				this->update_qr(Asub, qmin, passive_set, tau);
@@ -3764,6 +3776,7 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 
 				for(int i=0; i<p; i++){
 					int j=passive_set.at(i);
+					std::cout << "j=" << j << std::endl;
 					yp.local_el(i,0)=g->local_el(j,0);	//yp=g für alle variablen mit index in the passive_set
 				}
 				for(int i=p;i<n;i++){
@@ -3773,9 +3786,9 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 				//solve unconstrained LS problem nur für Variablen in P, also erste p Spalten von A	(Ry=g)	--> pdtrsv (Solve triangular system of linear equations)
 				ptrsv( &uplo, &trans, &diag, &p, A_loc, &one, &one, Asub->descriptor, yp_loc, &one, &one, y.descriptor, &incy);
 				std::cout << "SOLVING done" << std::endl;
-				for (int j=0;j<5;j++){
-					std::cout << yp.local_el(j,0) << std::endl;
-				}
+//				for (int j=0;j<5;j++){
+//					std::cout << yp.local_el(j,0) << std::endl;
+//				}
 
 				//checke, ob alle Variablen in x positiv sind, wenn ja, verlasse Inner Loop, wenn nicht, wiederhole Loop
 				//Finde kleinste Variable in y
@@ -3819,26 +3832,31 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 
 		}//Ende if(wmax>0) --------------------------------------------------------------------------------------------------------------------------
 
+		else{	//if wmax<=0, kein positives w mehr da in set Z
+			all_wi_negative=true;
+			std::cout << "no positive w could be found anymore!" << std::endl;
+		}
+
 
 	//Bedingung für while-loop überprüfen: all wi <= 0 für  alle i nicht in P
-	all_wi_negative=true;
-	for(int i=0;i<n;i++){
-		bool active=true;
-		for (int j=0;j<p;j++){		//überprüfe ob i in passive_set enthalten ist
-			if(passive_set.at(j)==i){
-				active=false;
-			}
-		}
-		if(active){			//für alle Variablen im active_set
-			if(w.local_el(i,0)>0){
-				all_wi_negative=false;
-			}
-		}
-	}
-	if(p==n){	//wenn alle Variablen im passive_set sind, also active_set ist leer
-		all_wi_negative=false;
-	}
-	std::cout << "all wi negative: " << all_wi_negative << std::endl;
+//	all_wi_negative=true;
+//	for(int i=0;i<n;i++){
+//		bool active=true;
+//		for (int j=0;j<p;j++){		//überprüfe ob i in passive_set enthalten ist
+//			if(passive_set.at(j)==i){
+//				active=false;
+//			}
+//		}
+//		if(active){			//für alle Variablen im active_set
+//			if(w.local_el(i,0)>0){
+//				all_wi_negative=false;
+//			}
+//		}
+//	}
+//	if(p==n){	//wenn alle Variablen im passive_set sind, also active_set ist leer
+//		all_wi_negative=false;
+//	}
+//	std::cout << "all wi negative: " << all_wi_negative << std::endl;
 
 	}
 	while ( p<pmax   &&   r.frobenius_norm() > epsilon * b->frobenius_norm()   &&   all_wi_negative==false && iteration<30);
@@ -3865,22 +3883,30 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::update_qr
 
 	//Initialize
 	int m=this->n_rows;
+	int n=this->n_columns;
+	std::shared_ptr<const ProcessGrid> grid=this->grid;
+	int blocksize= this-> column_block_size;
 	int p=passive_set.size();
 	std::cout << "p=" << p << std::endl;
+	//erstelle zusätzliche temporäre Matrix Atemp, damit elementary reflectors nicht überschrieben werden
+	ScaLAPACKMat<NumberType> Atemp (m, n, grid, blocksize, blocksize);
+	Asub->copy_to(Atemp);	//Atemp=Asub
 
 	//Submatrix Asub: alle rechten Spalten ab Index k bis p updaten
-	for (int i=k-1; i<p;i++){	//für bestimmte Spalten
+	for (int i=0; i<p;i++){	//für bestimmte Spalten 	(davor: i=k-1;i<p;i++)
 		int j=passive_set.at(i);
 		for (int l=0; l<m; l++){	//für ganze Spalte
 			//!AddColumn: neue Spalte von A anfügen!
-			if(k==p){
+//			if(k==p){
 				Asub->local_el(l,i)=this->local_el(l,j);		//Asub[i]=J[j];
-			}
-			// !DeleteColumn: Spalten von Asub aufrutschen!
-			else{
-				Asub->local_el(l,i)=Asub->local_el(l,i+1);		//Asub[i]=Asub[i+1];
-			}
-			std::cout << "Asub (" << l <<"," << i << ")= " << Asub->local_el(l,i) << std::endl;
+//			}
+//			// !DeleteColumn: Spalten von Asub aufrutschen!
+//			else{
+//				Asub->local_el(l,i)=Asub->local_el(l,i+1);		//Asub[i]=Asub[i+1];
+//			}
+				if(n==5){
+					std::cout << "Asub (" << l <<"," << i << ")= " << Asub->local_el(l,i) << std::endl;
+				}
 		}
 	}
 
@@ -3888,26 +3914,37 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::update_qr
 	int lwork=-1;
 	work.resize(1);
 	int info=0;
-	int n=p-k+1;
+	int n_=p-k+1;
 	int p_=p-1;		//weil Q(p-1) für Berechnung von Q(p) verwendet wird
 	NumberType *A_loc = Asub->values.data();
+	NumberType *Atemp_loc = Atemp.values.data();
 	int one=1;
 
 	if(k>1){	//nicht wenn k=1, also wenn noch kein Q aus QR-Zerlegung existiert
-		//Asub=Q*Asub		--> pdormqr (multiply by Q, an orthogonal matrix)
+		//Asub=Q_T*Asub		--> pdormqr (multiply by Q, an orthogonal matrix) --> Q ist in Atemp gespeichert
 		char side ='L';
-		char trans ='N';
+		char trans ='T';
 
-		pormqr(&side, &trans, &m, &n, &p_,  A_loc, &one, &k, Asub->descriptor, &tau[0], A_loc, &one, &k, Asub->descriptor, work.data(), &lwork, &info);
+		pormqr(&side, &trans, &m, &n_, &p_,  Atemp_loc, &one, &k, Atemp.descriptor, &tau[0], A_loc, &one, &k, Asub->descriptor, work.data(), &lwork, &info);
 		lwork=static_cast<int>(work[0]);
 		work.resize(lwork);
-		pormqr(&side, &trans, &m, &n, &p_,  A_loc, &one, &k, Asub->descriptor, &tau[0], A_loc, &one, &k, Asub->descriptor, work.data(), &lwork, &info);
+		pormqr(&side, &trans, &m, &n_, &p_,  Atemp_loc, &one, &k, Atemp.descriptor, &tau[0], A_loc, &one, &k, Asub->descriptor, work.data(), &lwork, &info);
 		std::cout << "Update QR: pdormqr done" << std::endl;
+
+		if(n==5){
+			for(int i=0;i<m;i++){
+				for (int j=0;j<m;j++){
+					std::cout << Asub->local_el(i,j) << "/ ";
+				}
+				std::cout << std::endl;
+			}
+		}
 	}
 
 	lwork=-1;
 	work.resize(1);
 	info=0;
+	//A_loc = Asub->values.data();
 
 	std::cout << "m= " << m << ", n= " << n << ", k= " << k<< std::endl;
 
@@ -3918,16 +3955,18 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::update_qr
 	pgeqrf(&m, &p, A_loc, &one, &one, Asub->descriptor, &tau[0], work.data(), &lwork, &info);
 	std::cout << "Update QR: pdgeqrf done, A=" << std::endl;
 
-	for(int i=0;i<m;i++){
-		for (int j=0;j<m;j++){
-			std::cout << Asub->local_el(i,j) << "/ ";
+	if(n==5){
+		for(int i=0;i<m;i++){
+			for (int j=0;j<m;j++){
+				std::cout << Asub->local_el(i,j) << "/ ";
+			}
+			std::cout << std::endl;
 		}
-		std::cout << std::endl;
 	}
-	std::cout << "tau=" << std::endl;
-	for (int j=0;j<m;j++){
-		std::cout << tau.at(j) << std::endl;
-	}
+//	std::cout << "tau=" << std::endl;
+//	for (int j=0;j<m;j++){
+//		std::cout << tau.at(j) << std::endl;
+//	}
 }
 
 //-----------------------------------------------------------------------------------------------------------------------
@@ -3938,6 +3977,7 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::update_g		//als Me
 
 	//Initialize
 	int m=this->n_rows;
+	int n=this->n_columns;
 	int lwork=-1;
 	work.resize(1);
 	int info=0;
@@ -3945,24 +3985,26 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::update_g		//als Me
 	NumberType *g_loc = g->values.data();
 	int one=1;
 	char side ='L';
-	char trans ='N';
+	char trans ='T';
 
-	std::cout << "g before pormqr: " << std::endl;
-	for (int j=0;j<m;j++){
-		std::cout << g->local_el(j,0) << std::endl;
+	if(n==5){
+		std::cout << "g before pormqr: " << std::endl;
+		for (int j=0;j<m;j++){
+			std::cout << g->local_el(j,0) << std::endl;
+		}
 	}
 
 	//Berechne Vektor g:	--> pdormqr (multiply orthogonal matrix)
-	if(k==p){		//g=Hp*g	(Hp ist in Spalte k von Asub gespeichert -> JA=k, g=(mx1)-->n=1,  k=1=p-k+1 -->weil nur ein H).....JC=k oder one?....nur eine spalte eigentlich
-		std::cout << "Update g: entered k==p= " << p<< std::endl;
-		pormqr(&side, &trans, &m, &one, &one,  A_loc, &one, &p, this->descriptor, &tau[0], g_loc, &one, &one, g->descriptor, work.data(), &lwork, &info);
-		lwork=static_cast<int>(work[0]);
-		work.resize(lwork);
-		pormqr(&side, &trans, &m, &one, &one,  A_loc, &one, &p, this->descriptor, &tau[0], g_loc, &one, &one, g->descriptor, work.data(), &lwork, &info);	//g wird überschrieben
-		std::cout << "Update g: pdormqr done" << std::endl;
-	}
+//	if(k==p){		//g=Hp*g	(Hp ist in Spalte k von Asub gespeichert -> JA=k, g=(mx1)-->n=1,  k=1=p-k+1 -->weil nur ein H).....JC=k oder one?....nur eine spalte eigentlich
+//		std::cout << "Update g: entered k==p= " << p<< std::endl;
+//		pormqr(&side, &trans, &m, &one, &one,  A_loc, &one, &p, this->descriptor, &tau[0], g_loc, &one, &one, g->descriptor, work.data(), &lwork, &info);
+//		lwork=static_cast<int>(work[0]);
+//		work.resize(lwork);
+//		pormqr(&side, &trans, &m, &one, &one,  A_loc, &one, &p, this->descriptor, &tau[0], g_loc, &one, &one, g->descriptor, work.data(), &lwork, &info);	//g wird überschrieben
+//		std::cout << "Update g: pdormqr done" << std::endl;
+//	}
 
-	else{			//g=Q*b	  (Qp is stored in Asub)
+//	else{			//g=Q*b	  (Qp is stored in Asub)
 		std::cout << "Update g: entered k=" << k <<" != p="<<p<< std::endl;
 		b->copy_to(*g);	//g=b;
 		g_loc = g->values.data();
@@ -3971,11 +4013,13 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::update_g		//als Me
 		work.resize(lwork);
 		pormqr(&side, &trans, &m, &one, &p,  A_loc, &one, &one, this->descriptor, &tau[0], g_loc, &one, &one, g->descriptor, work.data(), &lwork, &info);
 		std::cout << "Update g: pdormqr done" << std::endl;
-	}
+//	}
 
-	std::cout <<"vector g:"<< std::endl;
-	for (int j=0;j<m;j++){
-		std::cout << g->local_el(j,0) << std::endl;
+	if(n==5){
+		std::cout <<"vector g:"<< std::endl;
+		for (int j=0;j<m;j++){
+			std::cout << g->local_el(j,0) << std::endl;
+		}
 	}
 
 }
