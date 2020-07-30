@@ -3518,6 +3518,8 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 	bool all_wi_negative=false;
 	int iteration=0;
 	bool first_round=true;
+	bool innerloop=false;
+	std::vector<int> blacklist={-1,-1,-1,-1,-1};	//save the last five indizes
 	//std::cout << "Initialization done" << std::endl;
 	std::cout << "b-frobenius=" << b->frobenius_norm()*epsilon <<std::endl;
 
@@ -3528,13 +3530,14 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 	do{
 
 		iteration++;
+		std::cout << std::endl;
+		std::cout << std::endl;
 		std::cout << "While loop, iteration ------------------------------------" << iteration << std::endl;
 		std::cout << "r-frobenius=" << r.frobenius_norm() <<std::endl;
 		std::cout << "p=" << p << ", passive set: " ;
 		for (int i=0;i<p;i++){
 			std::cout << passive_set.at(i) << ",";
 		}
-		std::cout << std::endl;
 
 
 		//r=[0 g(-p)]T, N=m
@@ -3590,13 +3593,18 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 
 		//finde größte Variable von w
 		ScaLAPACKMat<NumberType> w_active (n, 1, grid, blocksize, 1);
-		for(int i=0; i<n;i++){			//copy all values from w to w_active, where the indizes are not in the passive set, copy them at the same position than in w
+		for(int i=0; i<n;i++){	//copy all values from w to w_active, where the indizes are not in the passive set, copy them at the same position than in w (except index on blacklist)
 			bool active=true;
-			for(int j=0;j<p;j++){		//gehe das passive set durch für jeden Index in w
+			for(int j=0;j<p;j++){	//gehe das passive set durch für jeden Index in w
 				if(i==passive_set.at(j)){
 					active=false;	//Index wurde in passive set gefunden, ist also nicht mehr active
 				}
 			}
+//			for(unsigned int j=0;j<blacklist.size();j++){	//gehe die blacklist durch
+//				if(i==blacklist.at(j)){
+//					active=false;	//Index ist auf der Blacklist und wird gleich behandelt wie ale Indizes im passive_set
+//				}
+//			}
 			if(active){
 				w_active.local_el(i,0)=w.local_el(i,0);	//setze den w_active(i)=w(i)
 				//alle Variablen mit Index in P bleiben Null --> wenn w_max gesucht wird: soll eh größer als Null sein
@@ -3610,17 +3618,11 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 		}
 
 		std::pair <double,std::array<int,2>> wmax=w_active.max_value(0,n-1,0,0);		//wmax[0]=wmax, wmax[1]=imax	//nur die Variablen prüfen, die nicht in passive_set sind
-//		//Umrechnung Index von w_active zu Index von w --> brauche ich nicht mehr
-//		for (int i=0;i<p;i++){
-//			if (passive_set.at(i)<=wmax.second[0]){
-//				wmax.second[0]++;
-//			}
-//		}
 
+		std::cout << std::endl;
 		std::cout << "wmax=" << wmax.first << ", imax=" << wmax.second[0] <<std::endl;
 		//wenn wmax positiv ist
 		if(wmax.first>0){	//-----------------------------------------------------------------------------------------------------------------------------------
-
 
 			//teste die zugehörige Spalte von A auf lineare Unbhängigkeit
 
@@ -3632,6 +3634,11 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 				std::cout << passive_set.at(i) <<",";
 			}
 			std::cout << std::endl;
+			//sperre den Index von wmax für die nächste Iteration
+			for (unsigned int i=0; i<blacklist.size()-1;i++){
+				blacklist.at(i)=blacklist.at(i+1);
+			}
+			blacklist.at(blacklist.size()-1)=wmax.second[0];	//letzter Eintrag wird neuer Index
 
 
 			//UPDATE QR nur für neue Spalte p (UPDATING) -->k=p
@@ -3641,14 +3648,7 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 
 			ScaLAPACKMat<NumberType> yp (n, 1, grid, blocksize, 1);
 
-//			for(int i=0; i<p; i++){
-//				std::cout << "p=" << p <<std::endl;
-//				int j=passive_set.at(i);
-//				std::cout << "i=" << i << " , j= " << j << std::endl;
-//				yp.local_el(i,0)=g->local_el(j,0);	//yp=g für alle variablen mit index in the passive_set, in y werden die Variablen umsortiert!
-//			}
-
-			//gp sind einfach die ersten p Zeilen bzw. Elemente aus g ? JA!
+			//gp sind einfach die ersten p Zeilen bzw. Elemente aus g
 			for (int i=0; i<p; i++){
 				yp.local_el(i,0)=g->local_el(i,0);
 			}
@@ -3677,24 +3677,38 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 //INNER LOOP		--------------------------------------------------------------------------------------------------------------------------------------------------------
 			//check if there are negative variabls, so if ymin<0 -> Inner Loop
 			while(ymin.first<=0){
+				std::cout << std::endl;
+				std::cout << std::endl;
 				std::cout << "-----------BEGIN INNER LOOP--------------" << std::endl;
+				innerloop=true;
 
 				std::cout << "p=" << p << ", passive set: ";
 				for (int i=0;i<p;i++){
 					std::cout << passive_set.at(i) << ", ";
 				}
 				std::cout << std::endl;
+				std::cout << "yp:(new but infeasible solution)" << std::endl;
+				for (int i=0; i<20;i++){
+					std::cout << yp.local_el(i,0) << std::endl;
+				}
+
+				std::cout << "y:(old solution with one index less)" << std::endl;
+				for (int i=0; i<20;i++){
+					std::cout << y.local_el(i,0) << std::endl;
+				}
 
 				//alpha berechnen
 				std::vector<double>  alpha_vec={};	//Vektor mit allen alpha Werten erstellen -->dann den kleinsten Wert finden
 				for (int i=0;i<p;i++){			//für alle ypi<=0  ,  i von 1 bis p
 					if(yp.local_el(i,0)<=0){
 						alpha_vec.push_back(  y.local_el(i,0) / (y.local_el(i,0)-yp.local_el(i,0))  );
+						std::cout << "entered if alpha at index " << i << std::endl;
+						std::cout << "y(i)= "<< y.local_el(i,0) << std::endl;
 					}
 				}
-//				for (unsigned int i=0;i<alpha_vec.size();i++){
-//					std::cout << "alpha_vec.at(" << i << ")= "<< alpha_vec.at(i) << std::endl;
-//				}
+				for (unsigned int i=0;i<alpha_vec.size();i++){
+					std::cout << "alpha_vec.at(" << i << ")= "<< alpha_vec.at(i) << std::endl;
+				}
 
 				auto it = std::min_element(alpha_vec.begin(), alpha_vec.end());
 				int index = std::distance( alpha_vec.begin(), it );
@@ -3702,102 +3716,113 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 				std::cout << "alpha=" << alpha << std::endl;
 
 //				std::cout << "vector y (old solution): "<< std::endl;
-//				for (int i=0;i<n;i++){
+//				for (int i=0;i<15;i++){
 //					std::cout << y.local_el(i,0) << std::endl;
 //				}
 
-				//update y als Interpolation zw vorheriger Lsg x und der neuen nicht machbaren y
-				y.add(yp, (1-alpha), alpha, false);		//y=y+alpha*(yp-y)=y+alpha*yp - alpha*y=  alpha*yp +(1-alpha)*y;
-				for(int i=0;i<m;i++){
-					if(y.local_el(i,0)<0.0000000001){
-						y.local_el(i,0)=0;
-					}
-				}
 
-				//alle fixed variables aus P entfernen, update set P
-				std::vector<int> p_0={};		//set erstellen mit den Indizes aller Variablen, die aus dem passive-set entfernt werden sollen
-				int anzahl_neg_variablen=0;
-				for (int i=0; i<p;i++){
-					if(y.local_el(i,0)<=0){		//eigentlich "nicht positive" variablen
-//						std::cout << "to delete: i=" << i << ", y(i)= " << y.local_el(i,0) << std::endl;
-						p_0.push_back(i);
-						anzahl_neg_variablen=p_0.size();		//bzw. anzahl_neg_variablen++;
-//						std::cout << "anzahl_nicht_positive_variablen= " << anzahl_neg_variablen << std::endl;
-					}
-				}
-
-
-				int qmin=p_0.at(0)+1;			//qmin=kleinster index in p_o, also einfach der erste aufgelistete; qmin um 1 erhöhen, da Indizes ab 0 beginnen, aber UPDATEQR Indizes ab 1 nimmt
-				std::cout << "qmin_index = " << qmin << std::endl;
-
-//				std::cout << "vector y (after updating): "<< std::endl;
-//				for (int i=0;i<n;i++){
-//					std::cout << y.local_el(i,0) << std::endl;
-//				}
-
-				std::vector<int> new_set={};
-				for (int i=0;i<p;i++){
-					bool to_delete=false;
-					for (int j=0;j<anzahl_neg_variablen;j++){
-						if(i==p_0.at(j)){
-							to_delete=true;
-							//std::cout << "entered if to delete" << std::endl;
+//				if(alpha!=0){
+					//update y als Interpolation zw vorheriger Lsg x und der neuen nicht machbaren y
+					y.add(yp, (1-alpha), alpha, false);		//y=y+alpha*(yp-y)=y+alpha*yp - alpha*y=  alpha*yp +(1-alpha)*y;
+					for(int i=0;i<m;i++){
+						if(y.local_el(i,0)<0.0000000001){		//ganz kleine Werte auf Null setzen
+							y.local_el(i,0)=0;
 						}
 					}
-					if (! to_delete){
-						new_set.push_back(passive_set.at(i));
-						//std::cout << "entered if to keep" << std::endl;
+
+					std::cout << "vector y (after updating with alpha): "<< std::endl;
+					for (int i=0;i<20;i++){
+						std::cout << y.local_el(i,0) << std::endl;
 					}
-				}
 
-				passive_set=new_set;		//geht das so?
-				p=passive_set.size();
-				std::cout << "p=" << p << std::endl;
+					//alle fixed variables aus P entfernen, update set P
+					std::vector<int> p_0={};		//set erstellen mit den Indizes aller Variablen, die aus dem passive-set entfernt werden sollen
+					int anzahl_neg_variablen=0;
+					for (int i=0; i<p;i++){
+						if(y.local_el(i,0)<=0){		//"nicht positive" variablen
+	//						std::cout << "to delete: i=" << i << ", y(i)= " << y.local_el(i,0) << std::endl;
+							p_0.push_back(i);
+							anzahl_neg_variablen=p_0.size();		//bzw. anzahl_neg_variablen++;
+	//						std::cout << "anzahl_nicht_positive_variablen= " << anzahl_neg_variablen << std::endl;
+						}
+					}
 
-				//reorder values in y
-				for (int i=qmin-1;i<p+1;i++){
-					y.local_el(i,0)=y.local_el(i+1,0);
-				}
-				for (int i=p+1;i<n;i++){
-					y.local_el(i,0)=0;
-				}
-//				std::cout << "vector y (after reordering): "<< std::endl;
-//				for (int i=0;i<n;i++){
-//					std::cout << y.local_el(i,0) << std::endl;
+					//Delete from passive set
+					int qmin=p_0.at(0)+1;			//qmin=kleinster index in p_o, also einfach der erste aufgelistete; qmin um 1 erhöhen, da Indizes ab 0 beginnen, aber UPDATEQR Indizes ab 1 nimmt
+					std::cout << "qmin_index = " << qmin << std::endl;
+					for(int i=0;i<anzahl_neg_variablen;i++){
+						std::cout << "Index of y to delete: " << passive_set.at(qmin-1) << std::endl;
+					}
+					std::vector<int> new_set={};
+					for (int i=0;i<p;i++){
+						bool to_delete=false;
+						for (int j=0;j<anzahl_neg_variablen;j++){
+							if(i==p_0.at(j)){
+								to_delete=true;
+								//std::cout << "entered if, to delete" << std::endl;
+							}
+						}
+						if (! to_delete){
+							new_set.push_back(passive_set.at(i));
+							//std::cout << "entered if, to keep" << std::endl;
+						}
+					}
+
+					passive_set=new_set;
+					p=passive_set.size();
+					std::cout << "p=" << p << std::endl;
+
+
+					//reorder values in y: alle Variablen nach der gelöschten um eins nach vorne ziehen, um Lücke zu schließen
+					for (int i=qmin-1;i<p+1;i++){
+						y.local_el(i,0)=y.local_el(i+1,0);
+					}
+					for (int i=p+1;i<n;i++){
+						y.local_el(i,0)=0;
+					}
+	//				std::cout << "vector y (after reordering): "<< std::endl;
+	//				for (int i=0;i<n;i++){
+	//					std::cout << y.local_el(i,0) << std::endl;
+	//				}
+
+					//UPDATE QR für alle Spalten rechts, der entfernten (DOWNDATING) -->k=qmin
+					this->update_qr(Asub, qmin, passive_set, tau);
+					Asub->update_g(b, g, qmin, p, tau);
+					std::cout << "UPDATING done!------------" << std::endl;
+
+					int incy=1;
+					A_loc = Asub->values.data();
+
+					//set yp=gp for Solving of the system
+					for(int i=0; i<p; i++){
+						yp.local_el(i,0)=g->local_el(i,0);
+					}
+					for(int i=p;i<n;i++){
+						yp.local_el(i,0)=0;
+					}
+
+					//solve unconstrained LS problem nur für Variablen in P, also erste p Spalten von A	(Ry=g)	--> pdtrsv (Solve triangular system of linear equations)
+					ptrsv( &uplo, &trans, &diag, &p, A_loc, &one, &one, Asub->descriptor, yp_loc, &one, &one, y.descriptor, &incy);
+					std::cout << "SOLVING done" << std::endl;
+					std::cout << "yp from solved system="<< std::endl;
+					for (int j=0;j<20;j++){
+						std::cout << yp.local_el(j,0) << std::endl;
+					}
+
+					//checke, ob alle Variablen in x positiv sind, wenn ja, verlasse Inner Loop, wenn nicht, wiederhole Loop
+					//Finde kleinste Variable in y hierfür
+					ymin=yp.min_value(0,p-1,0,0);
+					std::cout << "ymin=" << ymin.first << std::endl;
+//					std::cout << "p=" << p << ", passive set: ";
+//					for (int i=0;i<p;i++){
+//						std::cout << passive_set.at(i) << ", ";
+//					}
+//
+//				}
+//				else{
+//					ymin.first=1;
 //				}
 
-				//UPDATE QR für alle Spalten rechts, der entfernten (DOWNDATING) -->k=qmin
-				this->update_qr(Asub, qmin, passive_set, tau);
-				Asub->update_g(b, g, qmin, p, tau);
-				std::cout << "UPDATING done!------------" << std::endl;
-
-				int incy=1; 	//global increment for for the elements of y, either 1 or m_y
-				A_loc = Asub->values.data();
-
-				for(int i=0; i<p; i++){
-					int j=passive_set.at(i);
-					std::cout << "j=" << j << std::endl;
-					yp.local_el(i,0)=g->local_el(j,0);	//yp=g für alle variablen mit index in the passive_set
-				}
-				for(int i=p;i<n;i++){
-					yp.local_el(i,0)=0;
-				}
-
-				//solve unconstrained LS problem nur für Variablen in P, also erste p Spalten von A	(Ry=g)	--> pdtrsv (Solve triangular system of linear equations)
-				ptrsv( &uplo, &trans, &diag, &p, A_loc, &one, &one, Asub->descriptor, yp_loc, &one, &one, y.descriptor, &incy);
-				std::cout << "SOLVING done" << std::endl;
-//				for (int j=0;j<5;j++){
-//					std::cout << yp.local_el(j,0) << std::endl;
-//				}
-
-				//checke, ob alle Variablen in x positiv sind, wenn ja, verlasse Inner Loop, wenn nicht, wiederhole Loop
-				//Finde kleinste Variable in y
-				ymin=yp.min_value(0,p-1,0,0);
-				std::cout << "ymin=" << ymin.first << std::endl;
-				std::cout << "p=" << p << ", passive set: ";
-				for (int i=0;i<p;i++){
-					std::cout << passive_set.at(i) << ", ";
-				}
 				std::cout << std::endl;
 				std::cout << "--------------END INNER LOOP---------------" << std::endl;
 
@@ -3811,6 +3836,11 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 			for (int i=p;i<n;i++){
 				y.local_el(i,0)=0;
 			}
+
+//			std::cout << "y = yp: (for all variables in P)" << std::endl;
+//			for (int i=0; i<20;i++){
+//				std::cout << y.local_el(i,0) << std::endl;
+//			}
 
 			//Berechne x aus y --> x=Transformationsmatix*y --> reorder all variables with index in the passive set, all other variables=0
 			for(int i=0;i<p;i++){
@@ -3859,15 +3889,17 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 //	std::cout << "all wi negative: " << all_wi_negative << std::endl;
 
 	}
-	while ( p<pmax   &&   r.frobenius_norm() > epsilon * b->frobenius_norm()   &&   all_wi_negative==false && iteration<30);
+	while ( p<pmax   &&   r.frobenius_norm() > epsilon * b->frobenius_norm()   &&   all_wi_negative==false );	//&&iteration<30
 	//Ende OuterLoop		----------------------------------------------------------------------------------------------------------------
 
+	std::cout << "r.frobenius-norm= " << r.frobenius_norm() << std::endl;
 
 	//gebe Lösung x aus
 	std::cout << "Loesung x: ---------" << std::endl;
-	for (int i=0;i<n;i++){
-		std::cout << x->local_el(i,0) << std::endl;
-	}
+//	for (int i=0;i<n;i++){
+//		std::cout << x->local_el(i,0) << std::endl;
+//	}
+	std::cout << "InnerLoop: " << innerloop << std::endl;
 
 }
 
@@ -3919,6 +3951,7 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::update_qr
 	NumberType *A_loc = Asub->values.data();
 	NumberType *Atemp_loc = Atemp.values.data();
 	int one=1;
+
 
 	if(k>1){	//nicht wenn k=1, also wenn noch kein Q aus QR-Zerlegung existiert
 		//Asub=Q_T*Asub		--> pdormqr (multiply by Q, an orthogonal matrix) --> Q ist in Atemp gespeichert

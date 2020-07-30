@@ -158,9 +158,12 @@ int main (int argc, char **argv)
 
 
 
-		std::shared_ptr<ScaLAPACKMat<double>> b_  =  std::make_shared<ScaLAPACKMat<double>>(5, 1, grid, 2, 1);
-		ScaLAPACKMat<double> J_(5, 5, grid, 2, 2);
-		std::shared_ptr<ScaLAPACKMat<double>> x_  =  std::make_shared<ScaLAPACKMat<double>>(5, 1, grid, 2, 1);
+//		std::shared_ptr<ScaLAPACKMat<double>> b_  =  std::make_shared<ScaLAPACKMat<double>>(5, 1, grid, 2, 1);
+//		ScaLAPACKMat<double> J_(5, 5, grid, 2, 2);
+//		std::shared_ptr<ScaLAPACKMat<double>> x_  =  std::make_shared<ScaLAPACKMat<double>>(5, 1, grid, 2, 1);
+		std::shared_ptr<ScaLAPACKMat<double>> b_  =  std::make_shared<ScaLAPACKMat<double>>(10, 1, grid, 2, 1);
+		ScaLAPACKMat<double> J_(10,10, grid, 2, 2);
+		std::shared_ptr<ScaLAPACKMat<double>> x_  =  std::make_shared<ScaLAPACKMat<double>>(10, 1, grid, 2, 1);
 
 		//TEST 1
 //		J_.local_el(0,0)=1.;
@@ -177,48 +180,187 @@ int main (int argc, char **argv)
 //		J_.local_el(4,1)=1.;
 //		J_.local_el(4,2)=-1.;
 //		J_.local_el(4,3)=1.;
-//		b_->local_el(0,0)=5.;
-//		b_->local_el(1,0)=7.;
-//		b_->local_el(2,0)=-8.;
-//		b_->local_el(3,0)=7.;
-//		b_->local_el(4,0)=1.;
+//		b_->local_el(0,0)=3;
+//		b_->local_el(1,0)=5;
+//		b_->local_el(2,0)=-2.;
+//		b_->local_el(3,0)=-1;
+//		b_->local_el(4,0)=-2;
 
 		//TEST 2
-		J_.local_el(0,0)=1.;
-		J_.local_el(0,1)=2.;
-		J_.local_el(0,2)=3.;
-		J_.local_el(0,3)=0;
-		J_.local_el(0,4)=1.;
+//		J_.local_el(0,0)=1.;
+//		J_.local_el(0,1)=2.;
+//		J_.local_el(0,2)=3.;
+//		J_.local_el(0,3)=0;
+//		J_.local_el(0,4)=1.;
+//
+//		J_.local_el(1,0)=-1.;
+//		J_.local_el(1,1)=0.;
+//		J_.local_el(1,2)=1.;
+//		J_.local_el(1,3)=-1.;
+//		J_.local_el(1,4)=1.;
+//
+//		J_.local_el(2,0)=1.;
+//		J_.local_el(2,1)=2.;
+//		J_.local_el(2,2)=-1.;
+//		J_.local_el(2,3)=1.;
+//		J_.local_el(2,4)=0.;
+//
+//		J_.local_el(3,0)=2.;
+//		J_.local_el(3,1)=1.;
+//		J_.local_el(3,2)=2.;
+//		J_.local_el(3,3)=3.;
+//		J_.local_el(3,4)=-2.;
+//
+//		J_.local_el(4,0)=-2.;
+//		J_.local_el(4,1)=-1.;
+//		J_.local_el(4,2)=0.;
+//		J_.local_el(4,3)=2.;
+//		J_.local_el(4,4)=-1.;
+//
+//		b_->local_el(0,0)=11.;
+//		b_->local_el(1,0)=1.;
+//		b_->local_el(2,0)=6.;
+//		b_->local_el(3,0)=6.;
+//		b_->local_el(4,0)=-3.;
 
-		J_.local_el(1,0)=-1.;
-		J_.local_el(1,1)=0.;
-		J_.local_el(1,2)=1.;
-		J_.local_el(1,3)=-1.;
-		J_.local_el(1,4)=1.;
+		//TEST 3
+//		J_.local_el(0,0)=0.1;
+//		J_.local_el(0,1)=0;
+//		J_.local_el(0,2)=300;
+//		J_.local_el(0,3)=1;
+//		J_.local_el(0,4)=2;
+//
+//		J_.local_el(1,0)=1.;
+//		J_.local_el(1,1)=0;
+//		J_.local_el(1,2)=150;
+//		J_.local_el(1,3)=2;
+//		J_.local_el(1,4)=1;
+//
+//		J_.local_el(2,0)=0.1;
+//		J_.local_el(2,1)=2;
+//		J_.local_el(2,2)=50;
+//		J_.local_el(2,3)=0;
+//		J_.local_el(2,4)=0.5;
+//
+//		J_.local_el(3,0)=0.2;
+//		J_.local_el(3,1)=3;
+//		J_.local_el(3,2)=200;
+//		J_.local_el(3,3)=3;
+//		J_.local_el(3,4)=2.;
+//
+//		J_.local_el(4,0)=2;
+//		J_.local_el(4,1)=0.1;
+//		J_.local_el(4,2)=100;
+//		J_.local_el(4,3)=20;
+//		J_.local_el(4,4)=1;
+//
+//		b_->local_el(0,0)=100;
+//		b_->local_el(1,0)=0.1;
+//		b_->local_el(2,0)=1;
+//		b_->local_el(3,0)=0.1;
+//		b_->local_el(4,0)=1;
 
-		J_.local_el(2,0)=1.;
-		J_.local_el(2,1)=2.;
-		J_.local_el(2,2)=-1.;
-		J_.local_el(2,3)=1.;
-		J_.local_el(2,4)=0.;
+		//TEST 4
+//		for (int i=0;i<10;i++){
+//			J_.local_el(0,i)=1;
+//		}
+//		for (int i=0;i<10;i++){
+//					J_.local_el(1,i)=2;
+//				}
+//		for (int i=0;i<10;i++){
+//					J_.local_el(2,i)=3;
+//				}
+//		for (int i=0;i<10;i++){
+//					J_.local_el(3,i)=-2;
+//				}
+//		for (int i=0;i<10;i++){
+//					J_.local_el(4,i)=-1;
+//				}
+//		for (int i=0;i<10;i++){
+//					J_.local_el(5,i)=4;
+//				}
+//		for (int i=0;i<10;i++){
+//					J_.local_el(6,i)=5;
+//				}
+//		for (int i=0;i<10;i++){
+//					J_.local_el(7,i)=-4;
+//				}
+//		for (int i=0;i<10;i++){
+//					J_.local_el(8,i)=-3;
+//				}
+//		for (int i=0;i<10;i++){
+//					J_.local_el(9,i)=-5;
+//				}
+//		J_.local_el(0,9)=1;
+//		J_.local_el(1,9)=2;
+//		J_.local_el(2,9)=3;
+//		J_.local_el(3,9)=4;
+//		J_.local_el(4,9)=5;
+//		J_.local_el(5,9)=6;
+//		J_.local_el(6,9)=7;
+//		J_.local_el(7,9)=8;
+//		J_.local_el(8,9)=9;
+//		J_.local_el(9,9)=0;
+//
+//		b_->local_el(0,0)=17;
+//		b_->local_el(1,0)=34;
+//		b_->local_el(2,0)=51;
+//		b_->local_el(3,0)=-34;
+//		b_->local_el(4,0)=-17;
+//		b_->local_el(5,0)=68;
+//		b_->local_el(6,0)=85;
+//		b_->local_el(7,0)=-68;
+//		b_->local_el(8,0)=-51;
+//		b_->local_el(9,0)=64;
 
-		J_.local_el(3,0)=2.;
-		J_.local_el(3,1)=1.;
-		J_.local_el(3,2)=2.;
-		J_.local_el(3,3)=3.;
-		J_.local_el(3,4)=-2.;
+		//TEST%
+		for (int i=0;i<10;i++){
+			J_.local_el(i,0)=1;
+		}
+		for (int i=0;i<10;i++){
+					J_.local_el(i,1)=2;
+				}
+		for (int i=0;i<10;i++){
+					J_.local_el(i,2)=3;
+				}
+		for (int i=0;i<10;i++){
+					J_.local_el(i,3)=-2;
+				}
+		for (int i=0;i<10;i++){
+					J_.local_el(i,4)=-1;
+				}
+		for (int i=0;i<10;i++){
+					J_.local_el(i,5)=4;
+				}
+		for (int i=0;i<10;i++){
+					J_.local_el(i,6)=5;
+				}
+		for (int i=0;i<10;i++){
+					J_.local_el(i,7)=-4;
+				}
+		for (int i=0;i<10;i++){
+					J_.local_el(i,8)=-3;
+				}
+		for (int i=0;i<10;i++){
+					J_.local_el(i,9)=-5;
+				}
+		for(int i=0;i<10;i++){
+			for(int j=0;j<10;j++){
+				J_.local_el(i,j)+=i*0.1;
+			}
+		}
 
-		J_.local_el(4,0)=-2.;
-		J_.local_el(4,1)=-1.;
-		J_.local_el(4,2)=0.;
-		J_.local_el(4,3)=2.;
-		J_.local_el(4,4)=-1.;
+		b_->local_el(0,0)=-2.3;
+		b_->local_el(1,0)=-2.307;
+		b_->local_el(2,0)=-2.314;
+		b_->local_el(3,0)=-2.321;
+		b_->local_el(4,0)=-2.328;
+		b_->local_el(5,0)=-2.335;
+		b_->local_el(6,0)=-2.854;
+		b_->local_el(7,0)=-2.349;
+		b_->local_el(8,0)=-2.356;
+		b_->local_el(9,0)=-2.363;
 
-		b_->local_el(0,0)=11.;
-		b_->local_el(1,0)=1.;
-		b_->local_el(2,0)=6.;
-		b_->local_el(3,0)=6.;
-		b_->local_el(4,0)=-3.;
 
 
 //		for(int i=0;i<5;i++){
