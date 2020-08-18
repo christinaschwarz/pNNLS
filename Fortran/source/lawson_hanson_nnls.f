@@ -204,7 +204,7 @@ C     ------------------------------------------------------------------
       SUBROUTINE NNLS (A,MDA,M,N,B,X,RNORM,W,ZZ,INDEX,MODE,NSETP,NMAX) 
 C     ------------------------------------------------------------------
       integer I, II, IP, ITER, ITMAX, IZ, IZ1, IZ2, IZMAX, J, JJ, JZ, L
-      integer M, MDA, MODE,N, NPP1, NSETP, RTNKEY, NMAX
+      integer M, MDA, MODE,N, NPP1, NSETP, RTNKEY, NMAX, aa, IT
 c     integer INDEX(N)  
 c     double precision A(MDA,N), B(M), W(N), X(N), ZZ(M)   
       integer INDEX(*)  
@@ -233,11 +233,20 @@ C
       IZ1=1 
       NSETP=0   
       NPP1=1
+      IT=0
 C                             ******  MAIN LOOP BEGINS HERE  ******     
-   30 CONTINUE  
+   30 CONTINUE 
 C                  QUIT IF ALL COEFFICIENTS ARE ALREADY IN THE SOLUTION.
 C                        OR IF M COLS OF A HAVE BEEN TRIANGULARIZED.    
 C   
+      
+      IT=IT+1
+      aa=stdout
+      write(aa,*) "---------------------------"
+      write(aa,*) "Iteration...",IT
+      write(aa,*) "p=",NSETP  
+      
+      
       IF (IZ1 .GT.IZ2.OR.NSETP.GE.M) GO TO 350   
 C   
 C         COMPUTE COMPONENTS OF THE DUAL (NEGATIVE GRADIENT) VECTOR W().
@@ -258,14 +267,18 @@ C                                   FIND LARGEST POSITIVE W(J).
             WMAX=W(J)     
             IZMAX=IZ  
          endif
-   70 CONTINUE  
+   70 CONTINUE 
 C   
 C             IF WMAX .LE. 0. GO TO TERMINATION.
 C             THIS INDICATES SATISFACTION OF THE KUHN-TUCKER CONDITIONS.
 C   
+      write(aa,*) "wmax=",WMAX 
+      
       IF (WMAX .le. ZERO .or. NSETP .GE. NMAX) go to 350
       IZ=IZMAX  
-      J=INDEX(IZ)   
+      J=INDEX(IZ) 
+      
+      write(aa,*) "Index=",J-1   
 C   
 C     THE SIGN OF W(J) IS OK FOR J TO BE MOVED TO SET P.    
 C     BEGIN THE TRANSFORMATION AND CHECK NEW DIAGONAL ELEMENT TO AVOID  
@@ -287,17 +300,22 @@ C
          DO 120 L=1,M  
   120        ZZ(L)=B(L)    
          CALL H12 (2,NPP1,NPP1+1,M,A(1,J),1,UP,ZZ,1,1,1)   
-         ZTEST=ZZ(NPP1)/A(NPP1,J)  
+         ZTEST=ZZ(NPP1)/A(NPP1,J) 
+         
+C         write(aa,*) "ztest=",ZTEST 
 C   
 C                                     SEE IF ZTEST IS POSITIVE  
 C   
          IF (ZTEST .gt. ZERO) go to 140
       endif
+          
 C   
 C     REJECT J AS A CANDIDATE TO BE MOVED FROM SET Z TO SET P.  
 C     RESTORE A(NPP1,J), SET W(J)=0., AND LOOP BACK TO TEST DUAL
 C     COEFFS AGAIN.     
 C   
+      write(aa,*) "reject candidate!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+      
       A(NPP1,J)=ASAVE   
       W(J)=ZERO 
       GO TO 60  
@@ -315,7 +333,9 @@ C
       INDEX(IZ1)=J  
       IZ1=IZ1+1 
       NSETP=NPP1
-      NPP1=NPP1+1   
+      NPP1=NPP1+1  
+      
+      write(aa,*) "p=",NSETP   
 C   
       IF (IZ1 .le. IZ2) then
          DO 160 JZ=IZ1,IZ2 
@@ -328,20 +348,46 @@ C
          DO 180 L=NPP1,M   
   180       A(L,J)=ZERO   
       endif
-C   
+C 
+
+C      DO 185 IP=1,NSETP
+C  185		write(aa,*) "b after H12= ",B(IP) 
+C  
+C      DO 186 IP=1,NSETP
+C            L=INDEX(IP)
+C  186		write(aa,*) "A (line 1) after H12= ",A(1,L)
+C  
+C      DO 187 IP=1,NSETP
+C            L=INDEX(IP)
+C  187		write(aa,*) "A (line 2) after H12= ",A(2,L)
+C  
+C      DO 188 IP=1,NSETP
+C            L=INDEX(IP)
+C  188		write(aa,*) "A (line3) after H12= ",A(3,L)
+C  
+C      DO 189 IP=1,NSETP
+C            L=INDEX(IP)
+C  189		write(aa,*) "A (line4) after H12= ",A(4,L)
+  
+  
       W(J)=ZERO 
 C                                SOLVE THE TRIANGULAR SYSTEM.   
 C                                STORE THE SOLUTION TEMPORARILY IN ZZ().
       RTNKEY = 1
       GO TO 400 
   200 CONTINUE  
+  	  
+ 
 C   
 C                       ******  SECONDARY LOOP BEGINS HERE ******   
 C   
 C                          ITERATION COUNTER.   
 C 
   210 continue  
-      ITER=ITER+1   
+      ITER=ITER+1
+        
+
+      
       IF (ITER .gt. ITMAX) then
          MODE=3
 c        write (*,'(/a)') ' NNLS quitting on iteration count.'
@@ -361,25 +407,41 @@ C
                JJ=IP 
             endif
          endif
-  240 CONTINUE  
+  240 CONTINUE 
+  
 C   
 C          IF ALL NEW CONSTRAINED COEFFS ARE FEASIBLE THEN ALPHA WILL   
 C          STILL = 2.    IF SO EXIT FROM SECONDARY LOOP TO MAIN LOOP.   
 C   
+C      write(aa,*) "alpha=",ALPHA 
+      
       IF (ALPHA.EQ.TWO) GO TO 330   
 C   
 C          OTHERWISE USE ALPHA WHICH WILL BE BETWEEN 0. AND 1. TO   
 C          INTERPOLATE BETWEEN THE OLD X AND THE NEW ZZ.    
 C   
+      write(aa,*) "INNER LOOP"
+      
+C      DO 245 IP=1,NSETP
+C  245		write(aa,*) "before updating zz=",ZZ(IP) 
+      
       DO 250 IP=1,NSETP 
          L=INDEX(IP)   
          X(L)=X(L)+ALPHA*(ZZ(IP)-X(L)) 
   250 continue
+  
+C      DO 255 IP=1,NSETP
+C      		L=INDEX(IP)
+C  255		write(aa,*) "after updating x=",X(L) 
+  
 C   
 C        MODIFY A AND B AND THE INDEX ARRAYS TO MOVE COEFFICIENT I  
 C        FROM SET P TO SET Z.   
 C   
-      I=INDEX(JJ)   
+      I=INDEX(JJ)
+      
+      write(aa,*) "Index to delete=",I-1   
+         
   260 continue
       X(I)=ZERO 
 C   
@@ -405,14 +467,40 @@ c                 Apply procedure G2 (CC,SS,B(J-1),B(J))
 c
             TEMP = B(J-1)
             B(J-1) = CC*TEMP + SS*B(J)    
-            B(J)   =-SS*TEMP + CC*B(J)    
+            B(J)   =-SS*TEMP + CC*B(J)
+            
+C            write(aa,*) "Givens done"
+                
   280    continue
       endif
 c
+
+C      DO 285 IP=1,NSETP
+C  285		write(aa,*) "b after givens= ",B(IP) 
+C  
+C      DO 286 IP=1,NSETP
+C            L=INDEX(IP)
+C  286		write(aa,*) "A (line1) after givens= ",A(1,L)
+C  
+C      DO 287 IP=1,NSETP
+C            L=INDEX(IP)
+C  287		write(aa,*) "A (line2) after givens= ",A(2,L)
+C  
+C      DO 288 IP=1,NSETP
+C            L=INDEX(IP)
+C  288		write(aa,*) "A (line3) after givens= ",A(3,L)
+C  
+C      DO 289 IP=1,NSETP
+C            L=INDEX(IP)
+C  289		write(aa,*) "A (line4) after givens= ",A(4,L)
+ 
+
       NPP1=NSETP
       NSETP=NSETP-1     
       IZ1=IZ1-1 
       INDEX(IZ1)=I  
+      
+      write(aa,*) "p=",NSETP   
 C   
 C        SEE IF THE REMAINING COEFFS IN SET P ARE FEASIBLE.  THEY SHOULD
 C        BE BECAUSE OF THE WAY ALPHA WAS DETERMINED.
@@ -423,7 +511,8 @@ C
       DO 300 JJ=1,NSETP 
          I=INDEX(JJ)   
          IF (X(I) .le. ZERO) go to 260
-  300 CONTINUE  
+  300 CONTINUE
+  
 C   
 C         COPY B( ) INTO ZZ( ).  THEN SOLVE AGAIN AND LOOP BACK.
 C   
@@ -432,14 +521,23 @@ C
       RTNKEY = 2
       GO TO 400 
   320 CONTINUE  
+      
+C      DO 325 IP=1,NSETP
+C  325		write(aa,*) "after solving zz=",ZZ(IP) 
+      		
+      
+      
       GO TO 210 
 C                      ******  END OF SECONDARY LOOP  ******
 C   
   330 continue
       DO 340 IP=1,NSETP 
-          I=INDEX(IP)   
+          I=INDEX(IP)            
   340     X(I)=ZZ(IP)   
 C        ALL NEW COEFFS ARE POSITIVE.  LOOP BACK TO BEGINNING.  
+      
+
+      
       GO TO 30  
 C   
 C                        ******  END OF MAIN LOOP  ******   

@@ -7,8 +7,10 @@
 #include <deal.II/base/mpi.templates.h>
 #include <deal.II/base/std_cxx14/memory.h>
 #include <deal.II/base/exceptions.h>
+
 #include <vector>
 #include <algorithm>
+#include <boost/mpi.hpp>
 
 #include <hdf5.h>
 
@@ -3490,10 +3492,12 @@ ScaLAPACKMat<NumberType>::scale_rows(const InputVector &factors)
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
-	(const std::shared_ptr<ScaLAPACKMat<NumberType>> &b, std::shared_ptr<ScaLAPACKMat<NumberType>> &x, const double epsilon, const int pmax)
+	(const std::shared_ptr<ScaLAPACKMat<NumberType>> &b, std::shared_ptr<ScaLAPACKMat<NumberType>> &x, const double epsilon, const int pmax, const int max_iterations)
 
 {
 	//Initialize
@@ -3501,6 +3505,7 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 	int n=this->n_columns;
 	std::shared_ptr<const ProcessGrid> grid=this->grid;
 	int blocksize= this-> column_block_size;
+	std::cout << "column_blocksize=" << blocksize << std::endl;
 
 	ScaLAPACKMat<NumberType> y (n, 1, grid, blocksize, 1);
 	std::shared_ptr<ScaLAPACKMat<NumberType>> g  =  std::make_shared<ScaLAPACKMat<NumberType>>(m, 1, grid, blocksize, 1);
@@ -3512,16 +3517,13 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 	b->copy_to(*g);	//g=b;
 	std::vector<int> passive_set={};		//für free variables, xi>0, wi=0	,is empty at the beginning
 	int p=passive_set.size();				//Anzahl der Elemente in passive_set	,p=0 at beginning
-	//int tau_length=std::min(n,m);
 	int tau_length=m;
 	std::vector<NumberType> tau(tau_length,0.0); 				//contains scalar factors tau(j) of the elementary reflectors, initialisierung mit n Nullern
 	bool all_wi_negative=false;
 	int iteration=0;
 	bool first_round=true;
-	bool innerloop=false;
-	std::vector<int> blacklist={-1,-1,-1,-1,-1};	//save the last five indizes
-	//std::cout << "Initialization done" << std::endl;
-	std::cout << "b-frobenius=" << b->frobenius_norm()*epsilon <<std::endl;
+	std::vector<int> blacklist={-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};	//save the last five indizes
+	std::cout << "b-norm*epsilon = " << b->frobenius_norm()*epsilon <<std::endl;
 
 
 //OUTER LOOP	------------------------------------------------------------------------------
@@ -3531,22 +3533,25 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 
 		iteration++;
 		std::cout << std::endl;
-		std::cout << std::endl;
-		std::cout << "While loop, iteration ------------------------------------" << iteration << std::endl;
-		std::cout << "r-frobenius=" << r.frobenius_norm() <<std::endl;
-		std::cout << "p=" << p << ", passive set: " ;
-		for (int i=0;i<p;i++){
-			std::cout << passive_set.at(i) << ",";
-		}
-
+		std::cout << "While loop, iteration --------------------------------" << iteration << "      p="<< p << std::endl;
+		std::cout << "r-norm=" << r.frobenius_norm() <<std::endl;
+//		std::cout << "passive set: " ;
+//		for (int i=0;i<p;i++){
+//			std::cout << passive_set.at(i) << ",";
+//		}
+//		std::cout << std::endl;
 
 		//r=[0 g(-p)]T, N=m
 		for (int i=0; i<p; i++){	//ersten elemente von r gleich 0 setzen
-					r.local_el(i,0)=0;
+					r.set_element_to_value(i,0,0);
 		}
-		for (int i=p; i<m; i++){	//alle anderen elemente gleich den elementen von g setzen
-			r.local_el(i,0)=g->local_el(i,0);
-		}
+//		for (int i=p; i<m; i++){
+//			r.local_el(i,0)=g->local_el(i,0);
+//		}
+		std::pair<unsigned int,unsigned int> offsetA (p,0);
+		std::pair<unsigned int,unsigned int> offsetB (p,0);
+		std::pair<unsigned int,unsigned int> submatrixsize (m-p,1);
+		g->copy_to(r,offsetA,offsetB,submatrixsize);		//alle anderen elemente gleich den elementen von g setzen
 
 		int lwork=-1;	//size of work, here: default-value
 		int info=0;
@@ -3560,7 +3565,7 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 		if(n==5){
 			std::cout <<std::endl << "vector g bzw r vor pormqr:" << std::endl;
 			for(int i=0;i<5;i++){
-				std::cout << r.local_el(i,0) << std::endl;
+				std::cout << r.return_element(i,0) << std::endl;
 			}
 		}
 
@@ -3583,11 +3588,11 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 		if(n==5){
 			std::cout << "vector r nach pormqr:" << std::endl;
 			for(int i=0;i<5;i++){
-				std::cout << r.local_el(i,0) << std::endl;
+				std::cout << r.return_element(i,0) << std::endl;
 			}
 			std::cout << "vector w:" << std::endl;
 			for(int i=0;i<5;i++){
-				std::cout << w.local_el(i,0) << std::endl;
+				std::cout << w.return_element(i,0) << std::endl;
 			}
 		}
 
@@ -3606,52 +3611,151 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 //				}
 //			}
 			if(active){
-				w_active.local_el(i,0)=w.local_el(i,0);	//setze den w_active(i)=w(i)
+				w_active.set_element_to_value(i,0,w.return_element(i,0));	//setze den w_active(i)=w(i)
+				std::cout << "after return_element" << std::endl;
 				//alle Variablen mit Index in P bleiben Null --> wenn w_max gesucht wird: soll eh größer als Null sein
 			}
 		}
 		if(n==5){
 			std::cout << "vector w_active:" << std::endl;
 			for(int i=0;i<5;i++){
-				std::cout << w_active.local_el(i,0) << std::endl;
+				std::cout << w_active.return_element(i,0) << std::endl;
 			}
 		}
 
-		std::pair <double,std::array<int,2>> wmax=w_active.max_value(0,n-1,0,0);		//wmax[0]=wmax, wmax[1]=imax	//nur die Variablen prüfen, die nicht in passive_set sind
-
-		std::cout << std::endl;
+		std::pair <double,std::array<int,2>> wmax=w_active.max_value(0,n-1,0,0);		//nur die Variablen prüfen, die nicht in passive_set sind
 		std::cout << "wmax=" << wmax.first << ", imax=" << wmax.second[0] <<std::endl;
-		//wenn wmax positiv ist
-		if(wmax.first>0){	//-----------------------------------------------------------------------------------------------------------------------------------
 
-			//teste die zugehörige Spalte von A auf lineare Unbhängigkeit
+
+		//wenn wmax positiv ist: andernfalls: terminate
+		if(wmax.first>0){	//-----------------------------------------------------------------------------------------------------------------------------------
+			std::cout << "entered if wmax>0" << std::endl;
+
+			//Loop until we found a suitable imax=wmax.second[0] (avoid lin.dependence and neg. ztest) --> find a good candidate for the new index
+			bool found_good_imax=false;
+			int find_good_imax_iteration=0;
+			while(!found_good_imax){	//solange bis ein wmax gefuden ist, das akzeptabel ist und nicht linear abhängig
+				std::cout << "entered while to check for good imax" << std::endl;
+				found_good_imax=true;
+				find_good_imax_iteration++;
+
+				//check Linear Independence with SVD --------------------------------------------------------------------------------
+				//erstelle Matrix mit allen passive Spalten von A
+				ScaLAPACKMat<NumberType> A_lin_ind (m, p+1, grid, 1, 1);		//blocksize muss 1 sein, weil row_blocksiz=column_blocksize in SVD....???
+				if(p>0){	//weil eine einzige Spalte kann man nicht auf lineare Unabhängigkeit überprüfen
+					for (int i=0; i<p+1;i++){	//für alle Spalten mit Index in P
+						if (p>i){	//für alle Indizes in P
+							int j=passive_set.at(i);
+							offsetA.first=0;
+							offsetA.second=j;
+							offsetB.first=0;
+							offsetB.second=i;
+							submatrixsize.first=m;
+							submatrixsize.second=1;
+							this->copy_to(A_lin_ind,offsetA,offsetB,submatrixsize);	//copy one column (size mx1) from this (beginning 0/j) to A_lin_ind (beginning 0/i)
+							//							for (int l=0; l<m; l++){	//für ganze Spalte
+//								A_lin_ind.local_el(l,i)=this->local_el(l,j);		//Asub[i]=J[j];
+//							}
+						}
+						else{	//für den neuen Index
+							offsetA.first=0;
+							offsetA.second=wmax.second[0];
+							offsetB.first=0;
+							offsetB.second=i;
+							submatrixsize.first=m;
+							submatrixsize.second=1;
+							this->copy_to(A_lin_ind,offsetA,offsetB,submatrixsize);	//copy one column (size mx1) from this (beginning 0/j) to A_lin_ind (beginning 0/i)
+
+//							for (int l=0; l<m; l++){	//für ganze Spalte
+//								A_lin_ind.local_el(l,i)=this->local_el(l,wmax.second[0]);		//Asub[i]=J[j];
+//							}
+						}
+					}
+				}
+				std::vector<NumberType> sv(std::min(n,m));	//vector für die singular values
+				std::cout << "done1" << std::endl;
+//				sv=A_lin_ind.compute_SVD(nullptr,nullptr);	//nullptr, weil ich U bzw V (also die decomposition an sich) nicht benötige
+//				std::cout << "done svd" << std::endl;
+//				//std::cout <<"biggest SVD value = " << sv.at(0) << " / smallest SVD value = " << sv.at(sv.size()-1) << std::endl;
+//				double verhaeltnis=(sv.at(0)-sv.at(sv.size()-1))/sv.at(0);
+//				//std::cout << "SVmax-SVmin/SVmax= " << verhaeltnis << std::endl;
+//				if((p>0) && (verhaeltnis<0.00001)){
+//					found_good_imax=false;
+//					w_active.set_element_to_value(wmax.second[0],0,0);		//set the element of the dependent index to zero
+//					std::cout << "Linear Dependency!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+//					//recompute wmax
+//					wmax=w_active.max_value(0,n-1,0,0);		//wmax[0]=wmax, wmax[1]=imax	//nur die Variablen prüfen, die nicht in passive_set sind
+//					std::cout << "wmax=" << wmax.first << ", imax=" << wmax.second[0] <<std::endl;
+//				}
+
+				//check for ztest>0 (see sequential Fortran algorithm)  -----------------------------------------------------
+				//UPDATE QR nur für neue Spalte p to test if index is ok (UPDATING) -->k=p
+				passive_set.push_back(wmax.second[0]);	//zum Testen: Index zu P hinzufügen
+				p=passive_set.size();
+				//make copies of the matrices for the Testing
+				std::shared_ptr<ScaLAPACKMat<NumberType>> g_copy  =  std::make_shared<ScaLAPACKMat<NumberType>>(m, 1, grid, blocksize, 1);
+				std::shared_ptr<ScaLAPACKMat<NumberType>> Asub_copy  =  std::make_shared<ScaLAPACKMat<NumberType>>(m, n, grid, blocksize, blocksize);
+				std::vector<NumberType> tau_copy(tau_length,0.0);
+				g->copy_to(*g_copy);
+				Asub->copy_to(*Asub_copy);
+				tau_copy=tau;
+				this->update_qr(Asub_copy, p, passive_set, tau_copy);
+				Asub_copy->update_g(b, g_copy, p, p, tau_copy);
+				double ztest=g_copy->return_element(p-1,0)/Asub_copy->return_element(p-1,p-1);
+//				std::cout << "p="<<p<<std::endl;
+				std::cout << "g(p-1) = " << g_copy->return_element(p-1,0) << std::endl;
+				std::cout << "A(p-1,p-1) = " << Asub_copy->return_element(p-1,p-1) << std::endl;
+				std::cout << "ztest = " << ztest << std::endl;
+				passive_set.pop_back();		//Index nach dem Testen wieder Löschen
+				p=passive_set.size();
+				std::cout << "done2" << std::endl;
+//				if(ztest<=0){	//reject Index as candidte
+//					found_good_imax=false;
+//					w_active.set_element_to_value(wmax.second[0],0,0);		//set the element of the dependent index to zero
+//					std::cout << "Ztest is negative!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+//					//recompute wmax
+//					wmax=w_active.max_value(0,n-1,0,0);		//wmax[0]=wmax, wmax[1]=imax	//nur die Variablen prüfen, die nicht in passive_set sind
+//					std::cout << "wmax=" << wmax.first << ", imax=" << wmax.second[0] <<std::endl;
+//					std::cout << "Iteration......." << iteration << " / imax-iteration " << find_good_imax_iteration << ",     p=" << p << std::endl;
+//				}
+
+			}	//go on, found suitable imax	----------------------------------------------------------------------------------------------------------
+
+			std::cout << "done3" << std::endl;
 
 			//add imax to set_P		//(add this column to A)
 			passive_set.push_back(wmax.second[0]);
 			p=passive_set.size();		//bzw. p++
-			std::cout << "p=" <<p << ", passive set: " ;
-			for(int i=0; i<p; i++){
-				std::cout << passive_set.at(i) <<",";
-			}
-			std::cout << std::endl;
+//			std::cout << "p=" <<p << ", passive set: " ;
+//			for(int i=0; i<p; i++){
+//				std::cout << passive_set.at(i) <<",";
+//			}
+//			std::cout << std::endl;
+
 			//sperre den Index von wmax für die nächste Iteration
 			for (unsigned int i=0; i<blacklist.size()-1;i++){
 				blacklist.at(i)=blacklist.at(i+1);
 			}
 			blacklist.at(blacklist.size()-1)=wmax.second[0];	//letzter Eintrag wird neuer Index
 
-
 			//UPDATE QR nur für neue Spalte p (UPDATING) -->k=p
 			this->update_qr(Asub, p, passive_set, tau);		//this, weil Spalten von A kopiert werden
 			Asub->update_g(b, g, p, p, tau);
-			std::cout <<std:: endl << "UPDATING done!-----------" << std::endl;
+			//std::cout <<std:: endl << "UPDATING done!-----------" << std::endl;
 
 			ScaLAPACKMat<NumberType> yp (n, 1, grid, blocksize, 1);
 
-			//gp sind einfach die ersten p Zeilen bzw. Elemente aus g
-			for (int i=0; i<p; i++){
-				yp.local_el(i,0)=g->local_el(i,0);
-			}
+			//gp sind die ersten p Zeilen bzw. Elemente aus g
+//			for (int i=0; i<p; i++){
+//				yp.local_el(i,0)=g->local_el(i,0);
+//			}
+			offsetA.first=0;
+			offsetA.second=0;
+			offsetB.first=0;
+			offsetB.second=0;
+			submatrixsize.first=p;
+			submatrixsize.second=1;
+			g->copy_to(yp,offsetA,offsetB,submatrixsize);
 
 			const int incy=1; 	//global increment for for the elements of r, either 1 or m_r
 			const char uplo = 'U';
@@ -3662,58 +3766,58 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 			//solve unconstrained LS problem nur für Variable in P (Ry=g)	--> pdtrsv (Solve triangular system of linear equations)
 			//R ist in oberer Hälfte von A gespeichert, andere Werte von A bleiben unberücksichtigt		//nur für die ersten p Spalten von Asub
 			ptrsv( &uplo, &trans, &diag, &p, A_loc, &one, &one, Asub->descriptor, yp_loc, &one, &one, y.descriptor, &incy);
-			std::cout << "SOLVING done" << std::endl;
+			//std::cout << "SOLVING done" << std::endl;
 			if(n==5){
-				for (int j=0;j<p;j++){
-					std::cout << yp.local_el(j,0) << std::endl;
+				for (int j=0;j<5;j++){
+					std::cout << yp.return_element(j,0) << std::endl;
 				}
 			}
 
 			//Finde kleinste Variable in y
-			std::pair <double,std::array<int,2>> ymin=yp.min_value(0,p-1,0,0);	//ymax[0]=ymax, ymax[1]=imax
-			std::cout << "ymin=" << ymin.first << ", imin=" << ymin.second[0] <<", jmin=" << ymin.second[1] << std::endl;
+			std::pair <double,std::array<int,2>> ymin=yp.min_value(0,p-1,0,0);
+			//std::cout << "ymin=" << ymin.first << ", imin=" << ymin.second[0] <<", jmin=" << ymin.second[1] << std::endl;
 
 
 //INNER LOOP		--------------------------------------------------------------------------------------------------------------------------------------------------------
 			//check if there are negative variabls, so if ymin<0 -> Inner Loop
+			int IL_iteration=0;
 			while(ymin.first<=0){
-				std::cout << std::endl;
+				IL_iteration++;
 				std::cout << std::endl;
 				std::cout << "-----------BEGIN INNER LOOP--------------" << std::endl;
-				innerloop=true;
 
-				std::cout << "p=" << p << ", passive set: ";
-				for (int i=0;i<p;i++){
-					std::cout << passive_set.at(i) << ", ";
-				}
-				std::cout << std::endl;
-				std::cout << "yp:(new but infeasible solution)" << std::endl;
-				for (int i=0; i<20;i++){
-					std::cout << yp.local_el(i,0) << std::endl;
-				}
-
-				std::cout << "y:(old solution with one index less)" << std::endl;
-				for (int i=0; i<20;i++){
-					std::cout << y.local_el(i,0) << std::endl;
-				}
+//				std::cout << "p=" << p << ", passive set: ";
+//				for (int i=0;i<p;i++){
+//					std::cout << passive_set.at(i) << ", ";
+//				}
+//				std::cout << std::endl;
+//				std::cout << "yp:(new but infeasible solution)" << std::endl;
+//				for (int i=0; i<20;i++){
+//					std::cout << yp.return_element(i,0) << std::endl;
+//				}
+//
+//				std::cout << "y:(old solution with one index less)" << std::endl;
+//				for (int i=0; i<20;i++){
+//					std::cout << y.return_element(i,0) << std::endl;
+//				}
 
 				//alpha berechnen
 				std::vector<double>  alpha_vec={};	//Vektor mit allen alpha Werten erstellen -->dann den kleinsten Wert finden
 				for (int i=0;i<p;i++){			//für alle ypi<=0  ,  i von 1 bis p
-					if(yp.local_el(i,0)<=0){
-						alpha_vec.push_back(  y.local_el(i,0) / (y.local_el(i,0)-yp.local_el(i,0))  );
-						std::cout << "entered if alpha at index " << i << std::endl;
-						std::cout << "y(i)= "<< y.local_el(i,0) << std::endl;
+					if(yp.return_element(i,0)<=0){
+						alpha_vec.push_back(  y.return_element(i,0) / (y.return_element(i,0)-yp.return_element(i,0))  );
+//						std::cout << "entered if alpha at index " << i << std::endl;
+//						std::cout << "y(i)= "<< y.local_el(i,0) << std::endl;
 					}
 				}
-				for (unsigned int i=0;i<alpha_vec.size();i++){
-					std::cout << "alpha_vec.at(" << i << ")= "<< alpha_vec.at(i) << std::endl;
-				}
+//				for (unsigned int i=0;i<alpha_vec.size();i++){
+//					std::cout << "alpha_vec.at(" << i << ")= "<< alpha_vec.at(i) << std::endl;
+//				}
 
 				auto it = std::min_element(alpha_vec.begin(), alpha_vec.end());
 				int index = std::distance( alpha_vec.begin(), it );
 				double alpha=alpha_vec.at(index);
-				std::cout << "alpha=" << alpha << std::endl;
+//				std::cout << "alpha=" << alpha << std::endl;
 
 //				std::cout << "vector y (old solution): "<< std::endl;
 //				for (int i=0;i<15;i++){
@@ -3725,22 +3829,22 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 					//update y als Interpolation zw vorheriger Lsg x und der neuen nicht machbaren y
 					y.add(yp, (1-alpha), alpha, false);		//y=y+alpha*(yp-y)=y+alpha*yp - alpha*y=  alpha*yp +(1-alpha)*y;
 					for(int i=0;i<m;i++){
-						if(y.local_el(i,0)<0.0000000001){		//ganz kleine Werte auf Null setzen
-							y.local_el(i,0)=0;
+						if(y.return_element(i,0)<0.0000000001){		//ganz kleine Werte auf Null setzen
+							y.set_element_to_value(i,0,0);
 						}
 					}
 
-					std::cout << "vector y (after updating with alpha): "<< std::endl;
-					for (int i=0;i<20;i++){
-						std::cout << y.local_el(i,0) << std::endl;
-					}
+//					std::cout << "vector y (after updating with alpha): "<< std::endl;
+//					for (int i=0;i<20;i++){
+//						std::cout << y.return_element(i,0) << std::endl;
+//					}
 
 					//alle fixed variables aus P entfernen, update set P
 					std::vector<int> p_0={};		//set erstellen mit den Indizes aller Variablen, die aus dem passive-set entfernt werden sollen
 					int anzahl_neg_variablen=0;
 					for (int i=0; i<p;i++){
-						if(y.local_el(i,0)<=0){		//"nicht positive" variablen
-	//						std::cout << "to delete: i=" << i << ", y(i)= " << y.local_el(i,0) << std::endl;
+						if(y.return_element(i,0)<=0){		//"nicht positive" variablen
+							//std::cout << "Index to delete: i=" << i << ", y(i)= " << y.local_el(i,0) << std::endl;
 							p_0.push_back(i);
 							anzahl_neg_variablen=p_0.size();		//bzw. anzahl_neg_variablen++;
 	//						std::cout << "anzahl_nicht_positive_variablen= " << anzahl_neg_variablen << std::endl;
@@ -3749,7 +3853,7 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 
 					//Delete from passive set
 					int qmin=p_0.at(0)+1;			//qmin=kleinster index in p_o, also einfach der erste aufgelistete; qmin um 1 erhöhen, da Indizes ab 0 beginnen, aber UPDATEQR Indizes ab 1 nimmt
-					std::cout << "qmin_index = " << qmin << std::endl;
+//					std::cout << "qmin_index = " << qmin << std::endl;
 					for(int i=0;i<anzahl_neg_variablen;i++){
 						std::cout << "Index of y to delete: " << passive_set.at(qmin-1) << std::endl;
 					}
@@ -3770,44 +3874,59 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 
 					passive_set=new_set;
 					p=passive_set.size();
-					std::cout << "p=" << p << std::endl;
+					//std::cout << "p=" << p << std::endl;
 
 
 					//reorder values in y: alle Variablen nach der gelöschten um eins nach vorne ziehen, um Lücke zu schließen
-					for (int i=qmin-1;i<p+1;i++){
-						y.local_el(i,0)=y.local_el(i+1,0);
-					}
+//					for (int i=qmin-1;i<p+1;i++){
+//						y.local_el(i,0)=y.local_el(i+1,0);
+//					}
+					offsetA.first=qmin;
+					offsetA.second=0;
+					offsetB.first=qmin-1;
+					offsetB.second=0;
+					submatrixsize.first=p-qmin;
+					submatrixsize.second=1;
+					y.copy_to(y,offsetA,offsetB,submatrixsize);
 					for (int i=p+1;i<n;i++){
-						y.local_el(i,0)=0;
+						y.set_element_to_value(i,0,0);
 					}
+
 	//				std::cout << "vector y (after reordering): "<< std::endl;
 	//				for (int i=0;i<n;i++){
-	//					std::cout << y.local_el(i,0) << std::endl;
+	//					std::cout << y.return_element(i,0) << std::endl;
 	//				}
 
 					//UPDATE QR für alle Spalten rechts, der entfernten (DOWNDATING) -->k=qmin
 					this->update_qr(Asub, qmin, passive_set, tau);
 					Asub->update_g(b, g, qmin, p, tau);
-					std::cout << "UPDATING done!------------" << std::endl;
+					//std::cout << "UPDATING done!------------" << std::endl;
 
 					int incy=1;
 					A_loc = Asub->values.data();
 
 					//set yp=gp for Solving of the system
-					for(int i=0; i<p; i++){
-						yp.local_el(i,0)=g->local_el(i,0);
-					}
+//					for(int i=0; i<p; i++){
+//						yp.local_el(i,0)=g->local_el(i,0);
+//					}
+					offsetA.first=0;
+					offsetA.second=0;
+					offsetB.first=0;
+					offsetB.second=0;
+					submatrixsize.first=p;
+					submatrixsize.second=1;
+					g->copy_to(yp,offsetA,offsetB,submatrixsize);
 					for(int i=p;i<n;i++){
-						yp.local_el(i,0)=0;
+						yp.set_element_to_value(i,0,0);
 					}
 
 					//solve unconstrained LS problem nur für Variablen in P, also erste p Spalten von A	(Ry=g)	--> pdtrsv (Solve triangular system of linear equations)
 					ptrsv( &uplo, &trans, &diag, &p, A_loc, &one, &one, Asub->descriptor, yp_loc, &one, &one, y.descriptor, &incy);
-					std::cout << "SOLVING done" << std::endl;
-					std::cout << "yp from solved system="<< std::endl;
-					for (int j=0;j<20;j++){
-						std::cout << yp.local_el(j,0) << std::endl;
-					}
+					//std::cout << "SOLVING done" << std::endl;
+//					std::cout << "yp from solved system="<< std::endl;
+//					for (int j=0;j<p;j++){
+//						std::cout << yp.local_el(j,0) << std::endl;
+//					}
 
 					//checke, ob alle Variablen in x positiv sind, wenn ja, verlasse Inner Loop, wenn nicht, wiederhole Loop
 					//Finde kleinste Variable in y hierfür
@@ -3819,33 +3938,37 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 //					}
 //
 //				}
-//				else{
-//					ymin.first=1;
-//				}
 
-				std::cout << std::endl;
+
+				std::cout << "InnerLoop Iteration: " << IL_iteration << std::endl;
 				std::cout << "--------------END INNER LOOP---------------" << std::endl;
 
 			}//Ende InnerLoop	--------------------------------------------------------------------------------------------------
 
-
 			//Updating von y: y=y_p for i=0....p, alle restlichen Variablen=0
-			for (int i=0;i<p;i++){
-				y.local_el(i,0)=yp.local_el(i,0);
-			}
+//			for (int i=0;i<p;i++){
+//				y.local_el(i,0)=yp.local_el(i,0);
+//			}
+			offsetA.first=0;
+			offsetA.second=0;
+			offsetB.first=0;
+			offsetB.second=0;
+			submatrixsize.first=p;
+			submatrixsize.second=1;
+			yp.copy_to(y,offsetA,offsetB,submatrixsize);
 			for (int i=p;i<n;i++){
-				y.local_el(i,0)=0;
+				y.set_element_to_value(i,0,0);
 			}
 
-//			std::cout << "y = yp: (for all variables in P)" << std::endl;
-//			for (int i=0; i<20;i++){
-//				std::cout << y.local_el(i,0) << std::endl;
+//			std::cout << "y = yp: (end of outer loop)" << std::endl;
+//			for (int i=0; i<p;i++){
+//				std::cout << y.return_element(i,0) << std::endl;
 //			}
 
 			//Berechne x aus y --> x=Transformationsmatix*y --> reorder all variables with index in the passive set, all other variables=0
 			for(int i=0;i<p;i++){
 				int j=passive_set.at(i);
-				x->local_el(j,0)=y.local_el(i,0);
+				x->set_element_to_value (j, 0, y.return_element(i,0) );
 			}
 			for(int i=0;i<n;i++){
 				bool active=true;
@@ -3855,7 +3978,7 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 					}
 				}
 				if(active){
-					x->local_el(i,0)=0;		//set all other variables to zero
+					x->set_element_to_value(i,0,0);		//set all other variables to zero
 				}
 			}
 
@@ -3889,17 +4012,18 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 //	std::cout << "all wi negative: " << all_wi_negative << std::endl;
 
 	}
-	while ( p<pmax   &&   r.frobenius_norm() > epsilon * b->frobenius_norm()   &&   all_wi_negative==false );	//&&iteration<30
+	while ( p<pmax   &&   r.frobenius_norm() > epsilon * b->frobenius_norm()   &&   all_wi_negative==false &&iteration<max_iterations);
 	//Ende OuterLoop		----------------------------------------------------------------------------------------------------------------
 
 	std::cout << "r.frobenius-norm= " << r.frobenius_norm() << std::endl;
+	std::cout << "b-frobenius*epsilon = " << b->frobenius_norm()*epsilon <<std::endl;
+	std::cout << "Termination after " << iteration << " iterations!!!" << std::endl;
 
 	//gebe Lösung x aus
 	std::cout << "Loesung x: ---------" << std::endl;
-//	for (int i=0;i<n;i++){
-//		std::cout << x->local_el(i,0) << std::endl;
-//	}
-	std::cout << "InnerLoop: " << innerloop << std::endl;
+	for (int i=0;i<n;i++){
+		std::cout << x->return_element(i,0) << std::endl;
+	}
 
 }
 
@@ -3919,7 +4043,7 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::update_qr
 	std::shared_ptr<const ProcessGrid> grid=this->grid;
 	int blocksize= this-> column_block_size;
 	int p=passive_set.size();
-	std::cout << "p=" << p << std::endl;
+	//std::cout << "p=" << p << std::endl;
 	//erstelle zusätzliche temporäre Matrix Atemp, damit elementary reflectors nicht überschrieben werden
 	ScaLAPACKMat<NumberType> Atemp (m, n, grid, blocksize, blocksize);
 	Asub->copy_to(Atemp);	//Atemp=Asub
@@ -3927,20 +4051,36 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::update_qr
 	//Submatrix Asub: alle rechten Spalten ab Index k bis p updaten
 	for (int i=0; i<p;i++){	//für bestimmte Spalten 	(davor: i=k-1;i<p;i++)
 		int j=passive_set.at(i);
-		for (int l=0; l<m; l++){	//für ganze Spalte
-			//!AddColumn: neue Spalte von A anfügen!
-//			if(k==p){
-				Asub->local_el(l,i)=this->local_el(l,j);		//Asub[i]=J[j];
-//			}
-//			// !DeleteColumn: Spalten von Asub aufrutschen!
-//			else{
-//				Asub->local_el(l,i)=Asub->local_el(l,i+1);		//Asub[i]=Asub[i+1];
-//			}
-				if(n==5){
-					std::cout << "Asub (" << l <<"," << i << ")= " << Asub->local_el(l,i) << std::endl;
-				}
-		}
+		//copy whole column in one step
+		std::pair<unsigned int,unsigned int> offsetA (0,j);
+		std::pair<unsigned int,unsigned int> offsetB (0,i);
+		std::pair<unsigned int,unsigned int> submatrixsize (m,1);
+		this->copy_to(*Asub,offsetA,offsetB,submatrixsize);	//copy one column (size mx1) from this (beginning 0/j) to Asub (beginning 0/i)
+
+
+//		for (int l=0; l<m; l++){	//für ganze Spalte
+//			//!AddColumn: neue Spalte von A anfügen!
+////			if(k==p){
+//				Asub->local_el(l,i)=this->local_el(l,j);		//Asub[i]=J[j];
+////			}
+////			// !DeleteColumn: Spalten von Asub aufrutschen!
+////			else{
+////				Asub->local_el(l,i)=Asub->local_el(l,i+1);		//Asub[i]=Asub[i+1];
+////			}
+//				if(n==5){
+//					std::cout << "Asub (" << l <<"," << i << ")= " << Asub->local_el(l,i) << std::endl;
+//				}
+//		}
 	}
+
+//	std::cout << "A at beginning of updateQR" << std::endl;
+//	for(int i=0;i<5;i++){
+//		for (int j=0;j<5;j++){
+//			std::cout << Asub->return_element(i,j) << "/ ";
+//		}
+//		std::cout << std::endl;
+//	}
+
 
 	//Submatrix Asub mit altem Q multiplizieren
 	int lwork=-1;
@@ -3953,49 +4093,47 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::update_qr
 	int one=1;
 
 
-	if(k>1){	//nicht wenn k=1, also wenn noch kein Q aus QR-Zerlegung existiert
-		//Asub=Q_T*Asub		--> pdormqr (multiply by Q, an orthogonal matrix) --> Q ist in Atemp gespeichert
-		char side ='L';
-		char trans ='T';
-
-		pormqr(&side, &trans, &m, &n_, &p_,  Atemp_loc, &one, &k, Atemp.descriptor, &tau[0], A_loc, &one, &k, Asub->descriptor, work.data(), &lwork, &info);
-		lwork=static_cast<int>(work[0]);
-		work.resize(lwork);
-		pormqr(&side, &trans, &m, &n_, &p_,  Atemp_loc, &one, &k, Atemp.descriptor, &tau[0], A_loc, &one, &k, Asub->descriptor, work.data(), &lwork, &info);
-		std::cout << "Update QR: pdormqr done" << std::endl;
-
-		if(n==5){
-			for(int i=0;i<m;i++){
-				for (int j=0;j<m;j++){
-					std::cout << Asub->local_el(i,j) << "/ ";
-				}
-				std::cout << std::endl;
-			}
-		}
-	}
+//	if(k>1){	//nicht wenn k=1, also wenn noch kein Q aus QR-Zerlegung existiert
+//		//Asub=Q_T*Asub		--> pdormqr (multiply by Q, an orthogonal matrix) --> Q ist in Atemp gespeichert
+//		char side ='L';
+//		char trans ='T';
+//
+//		pormqr(&side, &trans, &m, &n_, &p_,  Atemp_loc, &one, &k, Atemp.descriptor, &tau[0], A_loc, &one, &k, Asub->descriptor, work.data(), &lwork, &info);
+//		lwork=static_cast<int>(work[0]);
+//		work.resize(lwork);
+//		pormqr(&side, &trans, &m, &n_, &p_,  Atemp_loc, &one, &k, Atemp.descriptor, &tau[0], A_loc, &one, &k, Asub->descriptor, work.data(), &lwork, &info);
+//		//std::cout << "Update QR: pdormqr done" << std::endl;
+//
+//		if(n==5){
+//			for(int i=0;i<5;i++){
+//				for (int j=0;j<5;j++){
+//					std::cout << Asub->return_element(i,j) << "/ ";
+//				}
+//				std::cout << std::endl;
+//			}
+//		}
+//	}
 
 	lwork=-1;
 	work.resize(1);
 	info=0;
 	//A_loc = Asub->values.data();
 
-	std::cout << "m= " << m << ", n= " << n << ", k= " << k<< std::endl;
-
 	//QR-Zerlegung für (k,Rsub): liefert neues R und Q bzw elementare Reflektoren		--> pdgeqrf (non pivoting QR-Factorization)
 	pgeqrf(&m, &p, A_loc, &one, &one, Asub->descriptor, &tau[0], work.data(), &lwork, &info);	//ganze Zerlegung oder nur für eine Spalte???? JA=k oder =one / N=p-k+1 oder =p
 	lwork=static_cast<int>(work[0]);
 	work.resize(lwork);
 	pgeqrf(&m, &p, A_loc, &one, &one, Asub->descriptor, &tau[0], work.data(), &lwork, &info);
-	std::cout << "Update QR: pdgeqrf done, A=" << std::endl;
+	//std::cout << "Update QR: pdgeqrf done, A=" << std::endl;
 
-	if(n==5){
-		for(int i=0;i<m;i++){
-			for (int j=0;j<m;j++){
-				std::cout << Asub->local_el(i,j) << "/ ";
-			}
-			std::cout << std::endl;
-		}
-	}
+//	std::cout << "A after pdgeqrf" << std::endl;
+//	for(int i=0;i<6;i++){
+//		for (int j=0;j<6;j++){
+//			std::cout << Asub->return_element(i,j) << "/ ";
+//		}
+//		std::cout << std::endl;
+//	}
+
 //	std::cout << "tau=" << std::endl;
 //	for (int j=0;j<m;j++){
 //		std::cout << tau.at(j) << std::endl;
@@ -4022,8 +4160,8 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::update_g		//als Me
 
 	if(n==5){
 		std::cout << "g before pormqr: " << std::endl;
-		for (int j=0;j<m;j++){
-			std::cout << g->local_el(j,0) << std::endl;
+		for (int j=0;j<p;j++){
+			std::cout << g->return_element(j,0) << std::endl;
 		}
 	}
 
@@ -4038,20 +4176,20 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::update_g		//als Me
 //	}
 
 //	else{			//g=Q*b	  (Qp is stored in Asub)
-		std::cout << "Update g: entered k=" << k <<" != p="<<p<< std::endl;
+		//std::cout << "Update g: entered k=" << k <<" != p="<<p<< std::endl;
 		b->copy_to(*g);	//g=b;
 		g_loc = g->values.data();
 		pormqr(&side, &trans, &m, &one, &p,  A_loc, &one, &one, this->descriptor, &tau[0], g_loc, &one, &one, g->descriptor, work.data(), &lwork, &info);
 		lwork=static_cast<int>(work[0]);
 		work.resize(lwork);
 		pormqr(&side, &trans, &m, &one, &p,  A_loc, &one, &one, this->descriptor, &tau[0], g_loc, &one, &one, g->descriptor, work.data(), &lwork, &info);
-		std::cout << "Update g: pdormqr done" << std::endl;
+		//std::cout << "Update g: pdormqr done" << std::endl;
 //	}
 
 	if(n==5){
-		std::cout <<"vector g:"<< std::endl;
-		for (int j=0;j<m;j++){
-			std::cout << g->local_el(j,0) << std::endl;
+		std::cout <<"vector g after pormqr:"<< std::endl;
+		for (int j=0;j<p;j++){
+			std::cout << g->return_element(j,0) << std::endl;
 		}
 	}
 
@@ -4061,59 +4199,312 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::update_g		//als Me
 
 
 //----------------------------------------------------------------------------------------------------------------------------------------------------------
+//
+//template <typename NumberType>
+//std::pair<NumberType,std::array<int,2>> ScaLAPACKMat<NumberType>::min_value	(const int row_begin, const int row_end, const int col_begin, const int col_end)	{
+//
+//	std::pair <NumberType,std::array<int,2>> minimum;		//minimum.first=min_value, minimum.second[0]=row_imin, minimum.second[1]=column_imin
+//	minimum.first=this->local_el(0,0);
+//	minimum.second[0]=0;
+//	minimum.second[1]=0;
+//
+//	for(int j=col_begin;j<=col_end;j++){	//j=column index
+//		for(int i=row_begin;i<=row_end;i++){	//i=row index
+//			if(this->local_el(i,j)<minimum.first){
+//				minimum.first=this->local_el(i,j);
+//				minimum.second[0]=i;	//[0]=row index
+//				minimum.second[1]=j;	//[1]=column index
+//			}
+//		}
+//	}
+//	return minimum;
+//}
+//
+////----------------------------------------------------------------------------------------------------------------------------------------------------------
+//
+//template <typename NumberType>
+//std::pair<NumberType,std::array<int,2>>  ScaLAPACKMat<NumberType>::max_value	(int row_begin, int row_end,int col_begin, int col_end)	{
+//
+//	std::pair <NumberType,std::array<int,2>> maximum;		//maximum.first=max_value, maximum.second[0]=row_imax, maximum.second[1]=column_imax
+//	maximum.first=this->local_el(0,0);
+//	maximum.second[0]=0;
+//	maximum.second[1]=0;
+//
+//	for(int j=col_begin;j<=col_end;j++){
+//		for(int i=row_begin;i<=row_end;i++){
+//			if(this->local_el(i,j)>maximum.first){
+//				maximum.first=this->local_el(i,j);
+//				maximum.second[0]=i;
+//				maximum.second[1]=j;
+//			}
+//		}
+//	}
+//	return maximum;
+//}
+//
 
-template <typename NumberType> std::pair<NumberType,std::array<int,2>> ScaLAPACKMat<NumberType>::min_value	(int col_begin, int col_end, int row_begin, int row_end)	{		//auch generalisieren für Matrizen
+//------------------------------------------------------------------------------------------------------------------
 
-	std::pair <NumberType,std::array<int,2>> minimum;		//minimum.first=min_value, minimum.second[0]=col_imin, minimum.second[1]=row_imin
-	minimum.first=this->local_el(0,0);
-	minimum.second[0]=0;
-	minimum.second[1]=0;
+template <typename NumberType>
+std::pair<NumberType,std::array<int,2>> ScaLAPACKMat<NumberType>::min_value
+			(const unsigned int row_begin, const unsigned int row_end, const unsigned int col_begin, const unsigned int col_end)
+			//Indices run from 0 to m-1 or n-1
+			//bei Gleicheit wird das Element genommen, welches zuerst (weiter links und weiter oben) vorkommt
+{
+    //Asserts
+	Assert(col_begin < this->n(),
+           dealii::ExcMessage("col_begin must be smaller than number of columns of the matrix"));
+    Assert(row_begin < this->m(),
+           dealii::ExcMessage("row_begin must be smaller than number of rows of the matrix"));
+    Assert(col_end < this->n(),
+           dealii::ExcMessage("col_end must be smaller than number of columns of the matrix"));
+    Assert(row_end < this->m(),
+           dealii::ExcMessage("row_end must be smaller than number of rows of the matrix"));
+    Assert(col_begin <= col_end,
+           dealii::ExcMessage("col_begin must be smaller or equal to col_end"));
+    Assert(row_begin <= row_end,
+           dealii::ExcMessage("row_begin must be smaller or equal to row_end"));
 
-	//For-Schleifen-Parallelisierung mit MPI-Reduce (?)
-	//Verteilung der Elemente des Vektors nach der Reihe nacheinander, aber kommt drauf an, welcher Prozess, welche Zeile hat?
-	//for(int i=rank;i<n;i+=size)
 
+    std::pair<NumberType,std::array<int,2>> minimum;		//minimum.first=min_value, minimum.second[0]=row_imin, minimum.second[1]=column_imin
+    minimum.second[0] = -1;
+    minimum.second[1] = -1;
+    bool first_element_processed=false;
 
-	for(int i=col_begin;i<=col_end;i++){
-		for(int j=row_begin;j<=row_end;j++){
-			if(this->local_el(i,j)<minimum.first){
-				minimum.first=this->local_el(i,j);
-				minimum.second[0]=i;
-				minimum.second[1]=j;
-			}
-		}
+    if (grid->mpi_process_is_active){ // processes not owning any matrix entries have nothing to do
+        for (int jj = 0; jj < n_local_columns; ++jj)		//j=column index .... iteriere zuerst über Spalten, da matrix Salteneise auf process grid verteilt ist
+        {
+            const unsigned int global_jj = global_column(jj);
+            if ((global_jj >= col_begin) && (global_jj <= col_end)){
+                for (int ii = 0; ii < n_local_rows; ++ii)		//i=row index
+                {
+                    const unsigned int global_ii = global_row(ii);
+                    if ((global_ii >= row_begin) && (global_ii <= row_end)){
+                        if (!first_element_processed)
+                        {
+                            minimum.first = local_el(ii,jj);
+                            minimum.second[0] = global_ii;	//[0]=row index=i
+                            minimum.second[1] = global_jj;	//[1]=column index=j
+                            first_element_processed = true;
+                        }
+                        else
+                        {
+                            if (minimum.first > local_el(ii,jj))
+                            {
+                                minimum.first = local_el(ii,jj);
+                                minimum.second[0] = global_ii;
+                                minimum.second[1] = global_jj;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
-	}
-	//MPI_Reduce(&local_minimum[0],&minimum[0],1,MPI_DOUBLE,MPI_MIN,0,MPI_COMM_WORLD);		//aber woher kriege ich dann den Index imin?
+    std::vector<NumberType> values = dealii::Utilities::MPI::all_gather(this->grid->mpi_communicator,minimum.first);
+    std::vector<int> row_indices = dealii::Utilities::MPI::all_gather(this->grid->mpi_communicator,minimum.second[0]);
+    std::vector<int> column_indices = dealii::Utilities::MPI::all_gather(this->grid->mpi_communicator,minimum.second[1]);
+    first_element_processed=false;
 
-	return minimum;
+    for (unsigned int a=0; a<values.size(); ++a)
+    {
+        if (row_indices[a] != -1)	//dieser eintrag wird nicht betrachtet
+        {
+        	if (!first_element_processed)
+            {
+                minimum.first = values[a];
+                minimum.second[0] = row_indices[a];
+                minimum.second[1] = column_indices[a];
+                first_element_processed = true;
+            }
+            else
+            {
+                if (minimum.first > values[a])
+                {
+                    minimum.first = values[a];
+                    minimum.second[0] = row_indices[a];
+                    minimum.second[1] = column_indices[a];
+                }
+            }
+        }
+    }
+    return minimum;
 }
 
-//----------------------------------------------------------------------------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------------------------------
 
-template <typename NumberType> std::pair<NumberType,std::array<int,2>>  ScaLAPACKMat<NumberType>::max_value	(int col_begin, int col_end, int row_begin, int row_end)	{
+template <typename NumberType>
+std::pair<NumberType,std::array<int,2>> ScaLAPACKMat<NumberType>::max_value
+			(const unsigned int row_begin, const unsigned int row_end, const unsigned int col_begin, const unsigned int col_end)
+			//Indices run from 0 to m-1 or n-1
+{
+    //Asserts
+	Assert(col_begin < this->n(),
+           dealii::ExcMessage("col_begin must be smaller than number of columns of the matrix"));
+    Assert(row_begin < this->m(),
+           dealii::ExcMessage("row_begin must be smaller than number of rows of the matrix"));
+    Assert(col_end < this->n(),
+           dealii::ExcMessage("col_end must be smaller than number of columns of the matrix"));
+    Assert(row_end < this->m(),
+           dealii::ExcMessage("row_end must be smaller than number of rows of the matrix"));
+    Assert(col_begin <= col_end,
+           dealii::ExcMessage("col_begin must be smaller or equal to col_end"));
+    Assert(row_begin <= row_end,
+           dealii::ExcMessage("row_begin must be smaller or equal to row_end"));
 
-	std::pair <NumberType,std::array<int,2>> maximum;		//maximum.first=max_value, maximum.second[0]=col_imax, maximum.second[1]=row_imax
-	maximum.first=this->local_el(0,0);
-	maximum.second[0]=0;
-	maximum.second[1]=0;
+    std::pair<NumberType,std::array<int,2>> maximum;		//maximum.first=min_value, maximum.second[0]=row_imin, maximum.second[1]=column_imin
+    maximum.second[0] = -1;
+    maximum.second[1] = -1;
+    bool first_element_processed=false;
 
-	for(int i=col_begin;i<=col_end;i++){
-		for(int j=row_begin;j<=row_end;j++){
-			if(this->local_el(i,j)>maximum.first){
-				maximum.first=this->local_el(i,j);
-				maximum.second[0]=i;
-				maximum.second[1]=j;
-			}
-		}
-	}
+    if (grid->mpi_process_is_active){ // processes not owning any matrix entries have nothing to do
+        for (int jj = 0; jj < n_local_columns; ++jj)		//j=column index
+        {
+            const unsigned int global_jj = global_column(jj);
+            if ((global_jj >= col_begin) && (global_jj <= col_end)){
+                for (int ii = 0; ii < n_local_rows; ++ii)		//i=row index
+                {
+                    const unsigned int global_ii = global_row(ii);
+                    if ((global_ii >= row_begin) && (global_ii <= row_end)){
+                        if (!first_element_processed)
+                        {
+                        	maximum.first = local_el(ii,jj);
+                        	maximum.second[0] = global_ii;	//[0]=row index=i
+                        	maximum.second[1] = global_jj;	//[1]=column index=j
+                            first_element_processed = true;
+                        }
+                        else
+                        {
+                            if (maximum.first < local_el(ii,jj))
+                            {
+                            	maximum.first = local_el(ii,jj);
+                            	maximum.second[0] = global_ii;
+                            	maximum.second[1] = global_jj;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
-	return maximum;
+    std::vector<NumberType> values = dealii::Utilities::MPI::all_gather(this->grid->mpi_communicator,maximum.first);
+    std::vector<int> row_indices = dealii::Utilities::MPI::all_gather(this->grid->mpi_communicator,maximum.second[0]);
+    std::vector<int> column_indices = dealii::Utilities::MPI::all_gather(this->grid->mpi_communicator,maximum.second[1]);
+    first_element_processed=false;
+
+    for (unsigned int a=0; a<values.size(); ++a)
+    {
+        if (row_indices[a] != -1)	//dieser eintrag wird nicht betrachtet
+        {
+        	if (!first_element_processed)
+            {
+        		maximum.first = values[a];
+        		maximum.second[0] = row_indices[a];
+        		maximum.second[1] = column_indices[a];
+                first_element_processed = true;
+            }
+            else
+            {
+                if (maximum.first < values[a])
+                {
+                	maximum.first = values[a];
+                	maximum.second[0] = row_indices[a];
+                	maximum.second[1] = column_indices[a];
+                }
+            }
+        }
+    }
+    return maximum;
 }
-
 
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------------------
+//set a specific element of a ScalapackMatrix (local_el) to a specific value (f.ex. zero)
+
+template <typename NumberType>
+void ScaLAPACKMat<NumberType>::set_element_to_value
+			(const unsigned int row_index, const unsigned int col_index, const NumberType value)
+{
+	//Asserts
+	Assert(col_index < this->n(),
+		   dealii::ExcMessage("col_index must be smaller than number of columns of the matrix"));
+	Assert(row_index < this->m(),
+		   dealii::ExcMessage("row_index must be smaller than number of rows of the matrix"));
+
+	if (grid->mpi_process_is_active){ // processes not owning any matrix entries have nothing to do
+
+		for (int jj = 0; jj < n_local_columns; ++jj){		//j=column index
+			const unsigned int global_jj = global_column(jj);
+			if (global_jj == col_index){	//gewünschter Spaltenindex wurde gefunden --> nur der Prozess der diese Spalte besitzt, sucht dann nach dem Reihenindex
+
+				for (int ii = 0; ii < n_local_rows; ++ii){		//i=row index
+					const unsigned int global_ii = global_row(ii);
+					if (global_ii == row_index){	//gewünschter Zeilenindex wurde gefunden -->Element local_el(i,j) gefunden
+
+						this->local_el(ii,jj)=value;	//value zuweisen
+					}
+				}
+			}
+		}
+	}
+}
+
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------
+//return a specific element of a ScalapackMatrix
+
+template <typename NumberType>
+NumberType ScaLAPACKMat<NumberType>::return_element
+			(const unsigned int row_index, const unsigned int col_index)
+{
+	//Asserts
+	Assert(col_index < this->n(),
+		   dealii::ExcMessage("col_index must be smaller than number of columns of the matrix"));
+	Assert(row_index < this->m(),
+		   dealii::ExcMessage("row_index must be smaller than number of rows of the matrix"));
+
+	boost::mpi::communicator communicator;
+	std::shared_ptr<const ProcessGrid> grid=this->grid;
+	communicator.barrier();
+
+	//std::cout << "row_index=" << row_index << " and col_index= " << col_index << std::endl;
+
+	NumberType element=0;
+	int process_rank=-1;
+
+	if (grid->mpi_process_is_active){ // processes not owning any matrix entries have nothing to do
+		for (int jj = 0; jj < n_local_columns; ++jj){		//j=column index
+			const unsigned int global_jj = global_column(jj);
+			if (global_jj == col_index){	//gewünschter Spaltenindex wurde gefunden
+				//std::cout << "found column index: " << global_jj << std::endl;
+
+				for (int ii = 0; ii < n_local_rows; ++ii){		//i=row index
+					const unsigned int global_ii = global_row(ii);
+					if (global_ii == row_index){	//gewünschter Zeilenindex wurde gefunden -->Element local_el(i,j) gefunden
+						//std::cout << "found row index: " << global_ii << std::endl;
+
+						//std::cout << "entered return element and found it ......................." << std::endl;
+						element=this->local_el(ii,jj);	//return-element
+						process_rank=dealii::Utilities::MPI::this_mpi_process(this->grid->mpi_communicator);
+						std::cout << "rank=" << process_rank << std::endl;
+					}
+				}
+			}
+		}
+	}
+
+	//send the variable "element" from the process, that owns it, to all the other processes --> broadcast
+	//element=dealii::Utilities::MPI::broadcast(element, process_rank, this->grid->mpi_communicator);
+	//boost::mpi::broadcast(grid->mpi_communicator,element,process_rank);
+	boost::mpi::broadcast(communicator,element,process_rank);
+
+	return element;
+}
+
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
 
 // instantiations
 #  include "ScaLAPACKMat.inst"

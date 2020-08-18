@@ -2,6 +2,7 @@
 #include <fstream>
 #include <algorithm>
 #include <array>
+#include <time.h>
 
 #include "ReadWrite.hpp"
 #include "ScaLAPACKMat.hpp"
@@ -20,6 +21,10 @@
 
 int main (int argc, char **argv)
 {
+	//Time measurement
+	double time1=0.0, tstart;
+	tstart = clock();
+
 	try
 	{
 		//initialize MPI
@@ -56,7 +61,6 @@ int main (int argc, char **argv)
 		dealii::LAPACKFullMatrix<double> ref_solution_lapack;
 
 		communicator.barrier();
-
 
 		//Einlesen der Datei "matrix_J.h5" in LapackFull-Matrix J
 		if (communicator.rank()==0)	{
@@ -115,16 +119,12 @@ int main (int argc, char **argv)
 		b_lapack.reinit(dimensions_J[0],1);
 		ref_solution_lapack.reinit(dimensions_J[1],1);
 
-		//pcout << "test2 "  << std::endl;
-
 		//copy b and ref_solution from std::vector to LapackFull matrix
 		std::copy(vector_b.begin(),vector_b.end(),b_lapack.begin());
 		std::copy(vector_ref_solution.begin(),vector_ref_solution.end(),ref_solution_lapack.begin());
 
 		//process grid erstellen als shared pointer
 		std::shared_ptr<ProcessGrid> grid = std::make_shared<ProcessGrid>(communicator, dimensions_J[0], dimensions_J[1], block_size, block_size);
-
-		//pcout << "test3 "  << std::endl;
 
 		// J, b, ref_solution und x als ScalapackMatrix erstellen
 		ScaLAPACKMat<double> J(dimensions_J[0], dimensions_J[1], grid, block_size, block_size);	//2tes blocksize=anzahl spalten
@@ -138,32 +138,17 @@ int main (int argc, char **argv)
 		ref_solution.copy_from(ref_solution_lapack,0);
 
 		//Bildschirmausgabe der Dimensionen
-//		pcout << "Dimensions of process grid: " << grid->get_process_grid_rows() << " x " << grid->get_process_grid_columns() << std::endl;
-//		pcout << "Dimensions of matrix J: " << J.m() << " x " << J.n() << std::endl;
-//		pcout << "Dimensions of vector b: " << J.m() << " x 1" << std::endl;
-//		pcout << std::endl << std::endl;
+		pcout << "Dimensions of process grid: " << grid->get_process_grid_rows() << " x " << grid->get_process_grid_columns() << std::endl;
+		pcout << "Dimensions of matrix J: " << J.m() << " x " << J.n() << std::endl;
+		pcout << "Dimensions of vector b: " << J.m() << " x 1" << std::endl;
+		pcout << std::endl << std::endl;
 
 
 		//TESTS-------------------------------------------------------------------------------------
 
-		//test min und max
-//		std::pair <double,std::array<int,2>> minJ=J.min_value(0,dimensions_J[0]-1,0,dimensions_J[1]-1);
-//		std::pair <double,std::array<int,2>> maxJ=J.max_value(0,dimensions_J[0]-1,0,dimensions_J[1]-1);
-//		std::pair <double,std::array<int,2>> minb=b->min_value(0,dimensions_J[0]-1,0,0);
-//		std::pair <double,std::array<int,2>> maxb=b->max_value(0,dimensions_J[0]-1,0,0);
-//		pcout << "Jmin_value = " << minJ.first << ", i/j: "<< minJ.second[0] << "/" << minJ.second[1] << std::endl;
-//		pcout << "Jmax_value = " << maxJ.first << ", i/j: "<< maxJ.second[0] << "/" << maxJ.second[1] << std::endl;
-//		pcout << "bmin_value = " << minb.first << ", i/j: "<< minb.second[0] << "/" << minb.second[1] <<std::endl;
-//		pcout << "bmax_value = " << maxb.first << ", i/j: "<< minb.second[0] << "/" << minb.second[1] <<std::endl;
-
-
-
-//		std::shared_ptr<ScaLAPACKMat<double>> b_  =  std::make_shared<ScaLAPACKMat<double>>(5, 1, grid, 2, 1);
-//		ScaLAPACKMat<double> J_(5, 5, grid, 2, 2);
-//		std::shared_ptr<ScaLAPACKMat<double>> x_  =  std::make_shared<ScaLAPACKMat<double>>(5, 1, grid, 2, 1);
-		std::shared_ptr<ScaLAPACKMat<double>> b_  =  std::make_shared<ScaLAPACKMat<double>>(10, 1, grid, 2, 1);
-		ScaLAPACKMat<double> J_(10,10, grid, 2, 2);
-		std::shared_ptr<ScaLAPACKMat<double>> x_  =  std::make_shared<ScaLAPACKMat<double>>(10, 1, grid, 2, 1);
+		std::shared_ptr<ScaLAPACKMat<double>> b_  =  std::make_shared<ScaLAPACKMat<double>>(5, 1, grid, 2, 1);
+		ScaLAPACKMat<double> J_(5, 5, grid, 2, 2);
+		std::shared_ptr<ScaLAPACKMat<double>> x_  =  std::make_shared<ScaLAPACKMat<double>>(5, 1, grid, 2, 1);
 
 		//TEST 1
 //		J_.local_el(0,0)=1.;
@@ -187,41 +172,43 @@ int main (int argc, char **argv)
 //		b_->local_el(4,0)=-2;
 
 		//TEST 2
-//		J_.local_el(0,0)=1.;
-//		J_.local_el(0,1)=2.;
-//		J_.local_el(0,2)=3.;
-//		J_.local_el(0,3)=0;
-//		J_.local_el(0,4)=1.;
-//
-//		J_.local_el(1,0)=-1.;
-//		J_.local_el(1,1)=0.;
-//		J_.local_el(1,2)=1.;
-//		J_.local_el(1,3)=-1.;
-//		J_.local_el(1,4)=1.;
-//
-//		J_.local_el(2,0)=1.;
-//		J_.local_el(2,1)=2.;
-//		J_.local_el(2,2)=-1.;
-//		J_.local_el(2,3)=1.;
-//		J_.local_el(2,4)=0.;
-//
-//		J_.local_el(3,0)=2.;
-//		J_.local_el(3,1)=1.;
-//		J_.local_el(3,2)=2.;
-//		J_.local_el(3,3)=3.;
-//		J_.local_el(3,4)=-2.;
-//
-//		J_.local_el(4,0)=-2.;
-//		J_.local_el(4,1)=-1.;
-//		J_.local_el(4,2)=0.;
-//		J_.local_el(4,3)=2.;
-//		J_.local_el(4,4)=-1.;
-//
-//		b_->local_el(0,0)=11.;
-//		b_->local_el(1,0)=1.;
-//		b_->local_el(2,0)=6.;
-//		b_->local_el(3,0)=6.;
-//		b_->local_el(4,0)=-3.;
+		pcout << "m="<<J_.m()<<", n="<<J_.n()<<std::endl;
+
+		J_.set_element_to_value(0,0,1);
+		J_.set_element_to_value(0,1,2);
+		J_.set_element_to_value(0,2,3);
+		J_.set_element_to_value(0,3,0);
+		J_.set_element_to_value(0,4,1);
+
+		J_.set_element_to_value(1,0,-1);
+		J_.set_element_to_value(1,1,0);
+		J_.set_element_to_value(1,2,1);
+		J_.set_element_to_value(1,3,-1);
+		J_.set_element_to_value(1,4,1);
+
+		J_.set_element_to_value(2,0,1);
+		J_.set_element_to_value(2,1,2);
+		J_.set_element_to_value(2,2,-1);
+		J_.set_element_to_value(2,3,1);
+		J_.set_element_to_value(2,4,0);
+
+		J_.set_element_to_value(3,0,2);
+		J_.set_element_to_value(3,1,1);
+		J_.set_element_to_value(3,2,2);
+		J_.set_element_to_value(3,3,3);
+		J_.set_element_to_value(3,4,-2);
+
+		J_.set_element_to_value(4,0,-2);
+		J_.set_element_to_value(4,1,-1);
+		J_.set_element_to_value(4,2,0);
+		J_.set_element_to_value(4,3,2);
+		J_.set_element_to_value(4,4,-1);
+
+		b_->set_element_to_value(0,0,11);
+		b_->set_element_to_value(1,0,1);
+		b_->set_element_to_value(2,0,6);
+		b_->set_element_to_value(3,0,6);
+		b_->set_element_to_value(4,0,-3);
 
 		//TEST 3
 //		J_.local_el(0,0)=0.1;
@@ -260,141 +247,54 @@ int main (int argc, char **argv)
 //		b_->local_el(3,0)=0.1;
 //		b_->local_el(4,0)=1;
 
-		//TEST 4
-//		for (int i=0;i<10;i++){
-//			J_.local_el(0,i)=1;
-//		}
-//		for (int i=0;i<10;i++){
-//					J_.local_el(1,i)=2;
-//				}
-//		for (int i=0;i<10;i++){
-//					J_.local_el(2,i)=3;
-//				}
-//		for (int i=0;i<10;i++){
-//					J_.local_el(3,i)=-2;
-//				}
-//		for (int i=0;i<10;i++){
-//					J_.local_el(4,i)=-1;
-//				}
-//		for (int i=0;i<10;i++){
-//					J_.local_el(5,i)=4;
-//				}
-//		for (int i=0;i<10;i++){
-//					J_.local_el(6,i)=5;
-//				}
-//		for (int i=0;i<10;i++){
-//					J_.local_el(7,i)=-4;
-//				}
-//		for (int i=0;i<10;i++){
-//					J_.local_el(8,i)=-3;
-//				}
-//		for (int i=0;i<10;i++){
-//					J_.local_el(9,i)=-5;
-//				}
-//		J_.local_el(0,9)=1;
-//		J_.local_el(1,9)=2;
-//		J_.local_el(2,9)=3;
-//		J_.local_el(3,9)=4;
-//		J_.local_el(4,9)=5;
-//		J_.local_el(5,9)=6;
-//		J_.local_el(6,9)=7;
-//		J_.local_el(7,9)=8;
-//		J_.local_el(8,9)=9;
-//		J_.local_el(9,9)=0;
+		//test min und max
+//		std::pair <double,std::array<int,2>> minJ=J.max_value(0,J.m()-1,0,J.n()-1);
+//		std::pair <double,std::array<int,2>> minb=b->max_value(0,J.m()-1,0,0);
+//		pcout << "Jmin_value = " << minJ.first << ", i/j: "<< minJ.second[0] << "/" << minJ.second[1] << std::endl;
+//		pcout << "bmin_value = " << minb.first << ", i/j: "<< minb.second[0] << "/" << minb.second[1] <<std::endl;
 //
-//		b_->local_el(0,0)=17;
-//		b_->local_el(1,0)=34;
-//		b_->local_el(2,0)=51;
-//		b_->local_el(3,0)=-34;
-//		b_->local_el(4,0)=-17;
-//		b_->local_el(5,0)=68;
-//		b_->local_el(6,0)=85;
-//		b_->local_el(7,0)=-68;
-//		b_->local_el(8,0)=-51;
-//		b_->local_el(9,0)=64;
+//		std::pair <double,std::array<int,2>> minJ3=J_.max_value(0,4,0,4);
+//		std::pair <double,std::array<int,2>> minb3=b_->max_value(0,4,0,0);
+//		pcout << "Jmin_value = " << minJ3.first << ", i/j: "<< minJ3.second[0] << "/" << minJ3.second[1] << std::endl;
+//		pcout << "bmin_value = " << minb3.first << ", i/j: "<< minb3.second[0] << "/" << minb3.second[1] <<std::endl;
 
-		//TEST%
-		for (int i=0;i<10;i++){
-			J_.local_el(i,0)=1;
-		}
-		for (int i=0;i<10;i++){
-					J_.local_el(i,1)=2;
-				}
-		for (int i=0;i<10;i++){
-					J_.local_el(i,2)=3;
-				}
-		for (int i=0;i<10;i++){
-					J_.local_el(i,3)=-2;
-				}
-		for (int i=0;i<10;i++){
-					J_.local_el(i,4)=-1;
-				}
-		for (int i=0;i<10;i++){
-					J_.local_el(i,5)=4;
-				}
-		for (int i=0;i<10;i++){
-					J_.local_el(i,6)=5;
-				}
-		for (int i=0;i<10;i++){
-					J_.local_el(i,7)=-4;
-				}
-		for (int i=0;i<10;i++){
-					J_.local_el(i,8)=-3;
-				}
-		for (int i=0;i<10;i++){
-					J_.local_el(i,9)=-5;
-				}
-		for(int i=0;i<10;i++){
-			for(int j=0;j<10;j++){
-				J_.local_el(i,j)+=i*0.1;
+		//Test copying whole parts
+//		std::pair<unsigned int,unsigned int> offsetA (1,0);
+//		std::pair<unsigned int,unsigned int> offsetB (0,0);
+//		std::pair<unsigned int,unsigned int> submatrixsize (3,1);
+//		J_.copy_to(J_,offsetA,offsetB,submatrixsize);
+//		std::cout << "try copying whole parts:" << std::endl;
+
+		for(int i=0;i<5;i++){
+			for(int j=0;j<5;j++){
+				double a=J_.return_element(i,j);
+				std::cout << a << "/";
 			}
+			std::cout << std::endl;
 		}
-
-		b_->local_el(0,0)=-2.3;
-		b_->local_el(1,0)=-2.307;
-		b_->local_el(2,0)=-2.314;
-		b_->local_el(3,0)=-2.321;
-		b_->local_el(4,0)=-2.328;
-		b_->local_el(5,0)=-2.335;
-		b_->local_el(6,0)=-2.854;
-		b_->local_el(7,0)=-2.349;
-		b_->local_el(8,0)=-2.356;
-		b_->local_el(9,0)=-2.363;
-
-
-
-//		for(int i=0;i<5;i++){
-//			std::cout << b_->local_el(i,0) << std::endl;
-//		}
-//		for (int i=0;i<5;i++){
-//			for(int j=0;j<5;j++){
-//				std::cout << J_.local_el(i,j) << std::endl;
-//			}
-//		}
-
 
 		//------------------------------------------------------------------------------------------
 
 
 		//neue Funktion pNNLS aufrufen
-		double tau=0.01;
-		int pmax= 100;		//Achtung, pmax sollte kleiner als m=2700 sein
-		J.parallel_NNLS(b,x,tau,pmax);
-		//J_.parallel_NNLS(b_,x_,tau,pmax);
-
-		//Teilschritte
-//		std::vector<int> passive_set={2};
-//		//std::cout << "passive set: " <<passive_set.at(0) << std::endl;
-//		std::vector<double> tau_(5,0.0);
-//		std::shared_ptr<ScaLAPACKMat<double>> Asub  =  std::make_shared<ScaLAPACKMat<double>>(5, 5, grid, 2, 2);
-//		J_.copy_to(*Asub);
-//		J_.update_qr(Asub, 1, passive_set, tau_);		//this, weil Spalten von A kopiert werden
-//		Asub->update_g(b_, b_, 1, 1, tau_);
+		double tau=1.0e-24;
+		int pmax= 1000;		//Achtung, pmax sollte kleiner als m=2700 sein
+		//J.parallel_NNLS(b,x,tau,pmax,6000);
+		//J_.parallel_NNLS(b_,x_,0.01,pmax,100);
 
 
 		//vergleiche x mit ref_solution, Abweichung berechnen
-		//.......
-		//pcout <<
+//		double res=0;
+//		for(int i=0;i<dimensions_J[1];i++){
+//			double diff=abs(x->local_el(i,0)-ref_solution.local_el(i,0));
+//			res+=diff;
+//		}
+		//calculate Residual
+//		ScaLAPACKMat<double> residual(dimensions_J[0], 1, grid, block_size, 1);
+//		J.mmult(residual,*x,false);
+//		residual.add(*b,1,-1,false);
+//		pcout << "residual.norm= " << residual.frobenius_norm() << std::endl;
+//		pcout << "residual.norm/b.norm= " << residual.frobenius_norm()/b->frobenius_norm() << std::endl;
 
 
     }
@@ -421,5 +321,12 @@ int main (int argc, char **argv)
                   << std::endl;
         return 1;
     }
+
+	//Time measurement
+	std::cout << std::endl;
+	time1 += clock() - tstart;
+	time1 = time1/CLOCKS_PER_SEC;
+	std::cout << "time = " << time1 << " sec." << std::endl;
+
 	return 0;
 }

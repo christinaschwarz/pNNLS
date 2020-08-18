@@ -236,7 +236,7 @@ public:
   //-----------------------------------------------------------------------------------------------------------------------------------------------------
 
  void parallel_NNLS
-  	(const std::shared_ptr<ScaLAPACKMat<NumberType>> &b, std::shared_ptr<ScaLAPACKMat<NumberType>> &x, const double epsilon, const int pmax);
+  	(const std::shared_ptr<ScaLAPACKMat<NumberType>> &b, std::shared_ptr<ScaLAPACKMat<NumberType>> &x, const double epsilon, const int pmax, const int max_iterations);
 
   void update_qr
   	(std::shared_ptr<ScaLAPACKMat<NumberType>> &Asub, const int k, const std::vector<int> passive_set, std::vector<NumberType> &tau);
@@ -246,10 +246,16 @@ public:
   	(const std::shared_ptr<ScaLAPACKMat<NumberType>> &b, std::shared_ptr<ScaLAPACKMat<NumberType>> &g, const int k, const int p, std::vector<NumberType> &tau);
 
   std::pair<NumberType,std::array<int,2>> min_value
-  	(int col_begin, int col_end, int row_begin, int row_end);
+  	(const unsigned int row_begin, const unsigned int row_end, const unsigned int col_begin, const unsigned int col_end);
 
   std::pair<NumberType,std::array<int,2>> max_value
-  	(int col_begin, int col_end, int row_begin, int row_end);
+  	(const unsigned int row_begin, const unsigned int row_end, const unsigned int col_begin, const unsigned int col_end);
+
+  void set_element_to_value
+  			(const unsigned int row_index, const unsigned int col_index, const NumberType value);
+
+  NumberType return_element
+  			(const unsigned int row_index, const unsigned int col_index);
 
 
   //-----------------------------------------------------------------------------------------------------------------------------------------------------
