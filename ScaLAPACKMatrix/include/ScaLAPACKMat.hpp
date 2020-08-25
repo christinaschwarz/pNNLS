@@ -241,9 +241,14 @@ public:
   void update_qr
   	(std::shared_ptr<ScaLAPACKMat<NumberType>> &Asub, const int k, const std::vector<int> passive_set, std::vector<NumberType> &tau);
 
+//  void update_qr_vereinfacht
+//  	(std::shared_ptr<ScaLAPACKMat<NumberType>> &Asub, const std::vector<int> passive_set, std::vector<NumberType> &tau);
 
   void update_g
   	(const std::shared_ptr<ScaLAPACKMat<NumberType>> &b, std::shared_ptr<ScaLAPACKMat<NumberType>> &g, const int k, const int p, std::vector<NumberType> &tau);
+
+//  void update_g_vereinfacht
+//    	(const std::shared_ptr<ScaLAPACKMat<NumberType>> &b, std::shared_ptr<ScaLAPACKMat<NumberType>> &g, const int p, std::vector<NumberType> &tau);
 
   std::pair<NumberType,std::array<int,2>> min_value
   	(const unsigned int row_begin, const unsigned int row_end, const unsigned int col_begin, const unsigned int col_end);

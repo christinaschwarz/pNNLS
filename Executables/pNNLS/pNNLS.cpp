@@ -16,14 +16,14 @@
 
 #include <boost/mpi.hpp>
 #include <boost/serialization/array.hpp>
+#include <deal.II/base/timer.h>
 
 
 
 int main (int argc, char **argv)
 {
 	//Time measurement
-	double time1=0.0, tstart;
-	tstart = clock();
+	dealii::Timer timer;
 
 	try
 	{
@@ -172,7 +172,6 @@ int main (int argc, char **argv)
 //		b_->local_el(4,0)=-2;
 
 		//TEST 2
-		pcout << "m="<<J_.m()<<", n="<<J_.n()<<std::endl;
 
 		J_.set_element_to_value(0,0,1);
 		J_.set_element_to_value(0,1,2);
@@ -210,43 +209,6 @@ int main (int argc, char **argv)
 		b_->set_element_to_value(3,0,6);
 		b_->set_element_to_value(4,0,-3);
 
-		//TEST 3
-//		J_.local_el(0,0)=0.1;
-//		J_.local_el(0,1)=0;
-//		J_.local_el(0,2)=300;
-//		J_.local_el(0,3)=1;
-//		J_.local_el(0,4)=2;
-//
-//		J_.local_el(1,0)=1.;
-//		J_.local_el(1,1)=0;
-//		J_.local_el(1,2)=150;
-//		J_.local_el(1,3)=2;
-//		J_.local_el(1,4)=1;
-//
-//		J_.local_el(2,0)=0.1;
-//		J_.local_el(2,1)=2;
-//		J_.local_el(2,2)=50;
-//		J_.local_el(2,3)=0;
-//		J_.local_el(2,4)=0.5;
-//
-//		J_.local_el(3,0)=0.2;
-//		J_.local_el(3,1)=3;
-//		J_.local_el(3,2)=200;
-//		J_.local_el(3,3)=3;
-//		J_.local_el(3,4)=2.;
-//
-//		J_.local_el(4,0)=2;
-//		J_.local_el(4,1)=0.1;
-//		J_.local_el(4,2)=100;
-//		J_.local_el(4,3)=20;
-//		J_.local_el(4,4)=1;
-//
-//		b_->local_el(0,0)=100;
-//		b_->local_el(1,0)=0.1;
-//		b_->local_el(2,0)=1;
-//		b_->local_el(3,0)=0.1;
-//		b_->local_el(4,0)=1;
-
 		//test min und max
 //		std::pair <double,std::array<int,2>> minJ=J.max_value(0,J.m()-1,0,J.n()-1);
 //		std::pair <double,std::array<int,2>> minb=b->max_value(0,J.m()-1,0,0);
@@ -265,36 +227,35 @@ int main (int argc, char **argv)
 //		J_.copy_to(J_,offsetA,offsetB,submatrixsize);
 //		std::cout << "try copying whole parts:" << std::endl;
 
-		for(int i=0;i<5;i++){
-			for(int j=0;j<5;j++){
-				double a=J_.return_element(i,j);
-				std::cout << a << "/";
-			}
-			std::cout << std::endl;
-		}
+//		for(int i=0;i<5;i++){
+//			for(int j=0;j<5;j++){
+//				double a=J_.return_element(i,j);
+//				std::cout << a << "/";
+//			}
+//			std::cout << std::endl;
+//		}
 
 		//------------------------------------------------------------------------------------------
 
 
 		//neue Funktion pNNLS aufrufen
-		double tau=1.0e-24;
+		double tau=1.0e-4;
 		int pmax= 1000;		//Achtung, pmax sollte kleiner als m=2700 sein
-		//J.parallel_NNLS(b,x,tau,pmax,6000);
-		//J_.parallel_NNLS(b_,x_,0.01,pmax,100);
+		J.parallel_NNLS(b,x,tau,pmax,500);
+		//J_.parallel_NNLS(b_,x_,tau,pmax,100);
 
 
-		//vergleiche x mit ref_solution, Abweichung berechnen
-//		double res=0;
-//		for(int i=0;i<dimensions_J[1];i++){
-//			double diff=abs(x->local_el(i,0)-ref_solution.local_el(i,0));
-//			res+=diff;
-//		}
 		//calculate Residual
-//		ScaLAPACKMat<double> residual(dimensions_J[0], 1, grid, block_size, 1);
-//		J.mmult(residual,*x,false);
-//		residual.add(*b,1,-1,false);
-//		pcout << "residual.norm= " << residual.frobenius_norm() << std::endl;
-//		pcout << "residual.norm/b.norm= " << residual.frobenius_norm()/b->frobenius_norm() << std::endl;
+		ScaLAPACKMat<double> residual(dimensions_J[0], 1, grid, block_size, 1);
+		J.mmult(residual,*x,false);
+		residual.add(*b,1,-1,false);
+		pcout << "residual.norm= " << residual.frobenius_norm() << std::endl;
+		pcout << "residual.norm/b.norm= " << residual.frobenius_norm()/b->frobenius_norm() << std::endl;
+
+		timer.stop();
+		pcout << "Elapsed wall time: " << timer.wall_time() << " seconds.\n";
+		std::cout << "Elapsed CPU time on process " << communicator.rank() << " is: " << timer.cpu_time() << " seconds.\n";
+
 
 
     }
@@ -322,11 +283,7 @@ int main (int argc, char **argv)
         return 1;
     }
 
-	//Time measurement
-	std::cout << std::endl;
-	time1 += clock() - tstart;
-	time1 = time1/CLOCKS_PER_SEC;
-	std::cout << "time = " << time1 << " sec." << std::endl;
+
 
 	return 0;
 }

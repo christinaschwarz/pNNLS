@@ -8,11 +8,15 @@
 #include <deal.II/lac/lapack_full_matrix.h>
 #include <deal.II/lac/vector.h>
 
+#include <deal.II/base/timer.h>
+
 
 
 int main(int argc, char **argv)
 {
 	using namespace dealii;
+	//Time measurement
+	dealii::Timer timer;
 
 	try
 	{
@@ -98,20 +102,10 @@ int main(int argc, char **argv)
 		dealii::Vector<double> solution_(5);
 		//dealii::Vector<double> solution_(10);
 
-//		for(unsigned int i=0;i<10;i++){
-//			std::cout << vector_b_(i) << std::endl;
-//		}
-//		for(unsigned int i=0;i<10;i++){
-//			for(unsigned int j=0;j<10;j++){
-//				std::cout << J_(i,j) << std::endl;
-//			}
-//		}
-
-
 		//DO NNLS
 		std::cout << "Start solution ... " << std::endl;
 
-		const double res = Fortran::NNLS(matrix_J,solution,vector_b,1000);
+		const double res = Fortran::NNLS(matrix_J,solution,vector_b,248);
 		//const double res = Fortran::NNLS(matrix_J_,solution_,vector_b_,100);
 
 		std::cout << "done, x=" << std::endl;
@@ -135,13 +129,10 @@ int main(int argc, char **argv)
 //		std::cout << "Difference to reference solution: " << ref_solution.l2_norm() << std::endl;
 //		std::cout << std::endl << std::endl;
 
-		int count=0;
-		for (unsigned int i=0;i<matrix_J.n();i++){
-			if(solution(i)!=0){
-				count++;
-			}
-		}
-		std::cout << "anzahl nonnegative elements in x: " << count << std::endl;
+
+		timer.stop();
+		std::cout << "Elapsed wall time: " << timer.wall_time() << " seconds.\n";
+
 
 
 	}
