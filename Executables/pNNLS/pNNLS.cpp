@@ -124,10 +124,10 @@ int main (int argc, char **argv)
 		std::copy(vector_ref_solution.begin(),vector_ref_solution.end(),ref_solution_lapack.begin());
 
 		//process grid erstellen als shared pointer
-		std::shared_ptr<ProcessGrid> grid = std::make_shared<ProcessGrid>(communicator, dimensions_J[0], dimensions_J[1], block_size, block_size);
+		std::shared_ptr<ProcessGrid> grid = std::make_shared<ProcessGrid>(communicator, communicator.size(), 1);
 
 		// J, b, ref_solution und x als ScalapackMatrix erstellen
-		ScaLAPACKMat<double> J(dimensions_J[0], dimensions_J[1], grid, block_size, block_size);	//2tes blocksize=anzahl spalten
+		ScaLAPACKMat<double> J(dimensions_J[0], dimensions_J[1], grid, block_size, dimensions_J[1]);	//2tes blocksize=anzahl spalten
 		ScaLAPACKMat<double> ref_solution(dimensions_J[1], 1, grid, block_size, 1);
 		std::shared_ptr<ScaLAPACKMat<double>> b  =  std::make_shared<ScaLAPACKMat<double>>(dimensions_J[0], 1, grid, block_size, 1);
 		std::shared_ptr<ScaLAPACKMat<double>> x  =  std::make_shared<ScaLAPACKMat<double>>(dimensions_J[1], 1, grid, block_size, 1);
@@ -239,22 +239,16 @@ int main (int argc, char **argv)
 
 
 		//neue Funktion pNNLS aufrufen
-		double tau=1.0e-4;
+		double tau=1.0e-24;
 		int pmax= 1000;		//Achtung, pmax sollte kleiner als m=2700 sein
-		J.parallel_NNLS(b,x,tau,pmax,500);
+		int iter=1000;
+		J.parallel_NNLS(b,x,tau,pmax,iter);
 		//J_.parallel_NNLS(b_,x_,tau,pmax,100);
-
-
-		//calculate Residual
-		ScaLAPACKMat<double> residual(dimensions_J[0], 1, grid, block_size, 1);
-		J.mmult(residual,*x,false);
-		residual.add(*b,1,-1,false);
-		pcout << "residual.norm= " << residual.frobenius_norm() << std::endl;
-		pcout << "residual.norm/b.norm= " << residual.frobenius_norm()/b->frobenius_norm() << std::endl;
 
 		timer.stop();
 		pcout << "Elapsed wall time: " << timer.wall_time() << " seconds.\n";
 		std::cout << "Elapsed CPU time on process " << communicator.rank() << " is: " << timer.cpu_time() << " seconds.\n";
+
 
 
 

@@ -3513,7 +3513,7 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 	dealii::ConditionalOStream pcout(std::cout,(dealii::Utilities::MPI::this_mpi_process(this->grid->mpi_communicator)==0));	//so that only process 0 does the terminal output
 	int m=this->n_rows;		//total number of rows of A
 	int n=this->n_columns;	//total number of columns of A
-	int blocksize= this-> column_block_size;	//the size of the blocks of A that are distributed on the process grid
+	int blocksize= this-> row_block_size;	//the size of the blocks of A that are distributed on the process grid
 	//pcout << "column_blocksize=" << blocksize << std::endl;
 
 	//vector y, that is similar to x, but has the variables ordered in the manner of the passive set
@@ -3524,7 +3524,7 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 	ScaLAPACKMat<NumberType> r (m, 1, this->grid, blocksize, 1);
 	//matrix Asub is a copy of A with reordered columns in the manner of the passive set,
 	//it is modified during the routine and contains the upper triangular matrix R and the vectors v, that define the elementary reflectors H, on exit
-	std::shared_ptr<ScaLAPACKMat<NumberType>> Asub  =  std::make_shared<ScaLAPACKMat<NumberType>>(m, n, this->grid, blocksize, blocksize);	//Matrix zur Bearbeitung
+	std::shared_ptr<ScaLAPACKMat<NumberType>> Asub  =  std::make_shared<ScaLAPACKMat<NumberType>>(m, n, this->grid, blocksize, n);	//Matrix zur Bearbeitung
 
 	this->copy_to(*Asub);
 	b->copy_to(*g);	//g=b;
@@ -3582,7 +3582,7 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 		}
 
 		//vector w=A_transposed*r
-		ScaLAPACKMat<NumberType> w (n, 1, this->grid, blocksize, 1);
+		ScaLAPACKMat<NumberType> w (n, 1, this->grid, n, 1);
 		this->Tmmult(w,r,false);
 
 		//find the biggest value in w
@@ -3891,6 +3891,8 @@ template <typename NumberType> void ScaLAPACKMat<NumberType>::parallel_NNLS
 	}
 
 	pcout << "Termination after " << iteration << " iterations!!!" << std::endl;
+	pcout << "Residual: norm(r)/norm(b) = " << r.frobenius_norm()/b->frobenius_norm() << std::endl;
+
 
 	//show the solution x
 //	pcout << "solution x: ---------" << std::endl;
